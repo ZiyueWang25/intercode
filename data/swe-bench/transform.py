@@ -4,6 +4,7 @@ import json
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('path_swe_bench', type=str, help='Path to SWE-bench dataset (.json file)')
+    parser.add_argument('output_name', type=str, help='Output agent bench dataset name', default="ic_swe_bench")
     args = parser.parse_args()
 
     dataset_swe_bench = []
@@ -24,5 +25,5 @@ if __name__ == '__main__':
                 "environment_setup_commit": t['environment_setup_commit']
             })
             
-    with open('ic_swe_bench.json', 'w') as f:
+    with open(f'{args.output_name}.json', 'w') as f:
         json.dump(dataset_swe_bench, fp=f)

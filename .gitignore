@@ -135,3 +135,5 @@ dmypy.json
 logs*/
 keys.cfg
 notebooks/playground.ipynb
+data/swe-bench/swe-bench.json
+data/swe-bench/ToyExamples_dataset.json
