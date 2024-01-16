@@ -7,7 +7,7 @@ from typing import Dict, List
 from experiments.policies import (
     CompletionGPTPolicy, ChatGPTPolicy, PalmChatPolicy, PalmCompletionPolicy
 )
-from experiments.utils import HANDICAP_MAP, PROMPT_MAP
+from experiments.utils import HANDICAP_MAP, PROMPT_MAP, SETTING_MAP
 from rich import print
 
 parser = argparse.ArgumentParser(description='N-turn evaluation for Intercode environment')
@@ -24,12 +24,6 @@ parser.add_argument('--verbose', action='store_true', help="print out logs")
 parser.add_argument('--model', type=str, help="model to use for policy", required=True)
 args = parser.parse_args()
 
-SETTING_MAP = {
-    "sql": "MySQL Database",
-    "bash": "Bourne Shell",
-    "python": "Python 3 Interpreter",
-    "ctf": "Capture the Flag"
-}
 
 def preprocess_ctf(record: Dict) -> List:
     cmds = [f"cd /ctf/{record['task_id']}"]

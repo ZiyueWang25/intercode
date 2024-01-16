@@ -1,7 +1,8 @@
 from .utils import (
     ACTION_PARSER_MAP,
     ACTION_PARSER_MAP_REACT,
-    HANDICAP_MAP
+    HANDICAP_MAP,
+    SETTING_MAP
 )
 from .prompts import (
     PromptTemplate,

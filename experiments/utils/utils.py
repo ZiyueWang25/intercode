@@ -1,6 +1,15 @@
 import json, re
 from typing import Dict
 
+SETTING_MAP = {
+    "sql": "MySQL Database",
+    "bash": "Bourne Shell",
+    "python": "Python 3 Interpreter",
+    "ctf": "Capture the Flag",
+    "swe": "Bourne Shell",
+}
+
+
 # MARK: Parsers
 
 def bash_parser(action: str):
