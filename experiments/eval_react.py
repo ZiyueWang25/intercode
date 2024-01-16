@@ -24,12 +24,6 @@ parser.add_argument('--max_turns', type=int, help='max number of interaction tur
 parser.add_argument('--verbose', action='store_true', help="print out logs")
 args = parser.parse_args()
 
-# Set OpenAPI key from environment or config file
-api_key = os.environ.get("OPENAI_API_KEY")
-if (api_key is None or api_key == "") and os.path.isfile(os.path.join(os.getcwd(), "keys.cfg")):
-    cfg = config.Config('keys.cfg')
-    api_key = cfg["OPENAI_API_KEY"]
-
 def llm(prompt, stop=["\n"]):
     response = openai.Completion.create(
       model="text-davinci-003",
