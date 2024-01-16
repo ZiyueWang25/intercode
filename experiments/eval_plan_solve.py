@@ -28,12 +28,6 @@ def preprocess_sql(record: Dict) -> List:
     db = record["db"]
     return [f"use {db}"]
 
-# Set OpenAPI key from environment or config file
-api_key = os.environ.get("OPENAI_API_KEY")
-if (api_key is None or api_key == "") and os.path.isfile(os.path.join(os.getcwd(), "keys.cfg")):
-    cfg = config.Config('keys.cfg')
-    api_key = cfg["OPENAI_API_KEY"]
-
 def llm(messages, stop=["\n"]):
     response = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
