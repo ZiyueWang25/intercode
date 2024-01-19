@@ -377,6 +377,54 @@ Your {self.language} code here
 """
 
 
+class SWETemplate(PromptTemplate):
+    def __init__(self, language: str, setting: str):
+        super().__init__(language, setting)
+        self.message_history = ""
+    
+    def get_init_msg(self):
+        return """You are an exceptional and helpful software engineer and you are asked to fix a feature request or bug on a Github \
+repository. You have access to the request, code in the repository and terminal output. Initially, some tests are failed and in the end \
+they should be successful after fixing the request. You can use `cat`, `ls`, `pytest` and etc to view the code and check the test results. \
+You are not allowed to modify the tests and you can use the following special commands to interact with the terminal.
+
+- `COMMAND:xxx”: Run command xxx. The command can be `cat`, `ls`, `pytest` and etc. It can also be applying a patch, for example: `git apply xxx` \
+applies patch xxx to the codebase. The patch format is following the standard Github patch format without commit specific metadata. \
+Example content is below: 
+```
+diff --git a/foo.c b/foo.c
+--- a/foo.c
++++ b/foo.c
+@@ -1,5 +1,5 @@
+ #include <string.h>
+
+ int check (char *string) {
+-    return !strcmp(string, "ok");
++    return (string != NULL) && !strcmp(string, "ok");
+ }
+```
+- `SUBMIT`: After you feel confident about the solution. You can call `SUBMIT` to submit your solution.
+- `QUIT: If you feel incapable of solving the request, you can call `QUIT` to leave the task.
+
+You will be given the feature request in the beginning. Here is an example feature request and patch to fix it.
+“Request: Adjust foo.py so that it can pass the test”
+“PATCH:diff --git a/foo.py b/foo.py\n--- a/foo.py\n+++ b/foo.py\n@@ -1,4 +1,4 @@\n # example toy functions to test LLM agent fixing code ability\n \n def double(x):\n-  return x + 1\n+  return x * 2\n”
+
+Before every action (COMMAND, SUBMIT or QUIT) you want to take, please explain your thoughts.
+"""
+
+    def get_query_msg(self, query):
+        return f"""Here is the feature request or bug: “{query}”
+Please fix it independently."""
+
+    def get_obs_msg(self, observation, reward):
+        if isinstance(observation, str) and observation == "" or isinstance(observation, list) and len(observation) == 0:
+            observation = "No output"
+        return f"""{self.setting} Output:\n{observation}
+
+Explain your thoughts and use COMMAND, SUBMIT or QUIT to tell the next step."""
+
+
 # completion
 class TemplateV1(PromptTemplate):
     def __init__(self, language: str, setting: str):
@@ -422,9 +470,9 @@ Do NOT generate any output or reward.
             f"- Reward: {reward}\n\n"
         message = f"Analyze your previous actions and output a different {self.language} command to maximize your reward to 1\n" + self.message_history + "-"*10 + "\n" + \
         "Output something else."
-        return message 
-            
-            
+        return message
+
+
 # PaLM chat
 class TemplateV2(PromptTemplate):        
     def get_init_msg(self):
@@ -729,5 +777,6 @@ PROMPT_MAP = {
     "react": TemplateReAct,
     "ctf": TemplateCTF,
     "plan_solve": TemplatePlanSolve,
-    "function": TemplateCodeFunction
+    "function": TemplateCodeFunction,
+    "swe": SWETemplate,
 }

@@ -9,7 +9,13 @@ SETTING_MAP = {
     "swe": "Bourne Shell",
 }
 
-
+LANG_BY_ENV = {
+    "bash": "bash",
+    "python": "bash",
+    "sql": "sql",
+    "ctf": "bash",
+    "swe": "bash",
+}
 # MARK: Parsers
 
 def bash_parser(action: str):

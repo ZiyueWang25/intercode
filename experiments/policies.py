@@ -16,7 +16,7 @@ class HumanPolicy(BasePolicy):
         super().__init__()
     
     def forward(self, query, observation, available_actions):
-        action = input('> ')
+        action = input('Human Action > ')
         return action
     
 class CompletionGPTPolicy(BasePolicy):
@@ -63,7 +63,8 @@ class CompletionGPTPolicy(BasePolicy):
         return action, is_code
 
 class ChatGPTPolicy(BasePolicy):
-    def __init__(self, language: str, setting: str, template: str, dialogue_limit: int = None, model: str = "gpt-3.5-turbo", response_limit: int = 1000):
+    def __init__(self, language: str, setting: str, template: str, dialogue_limit: int = None,
+                 model: str = "gpt-3.5-turbo", response_limit: int = 1000, verbose=False):
         super().__init__()
         self.language = language.upper()
         self.setting = setting
@@ -72,14 +73,18 @@ class ChatGPTPolicy(BasePolicy):
         self.action_parser = ACTION_PARSER_MAP[language]
         self.model = model
         self.response_limit = response_limit
+        self.verbose = verbose
     
     def reset(self):
         self.dialogue = [{"role": "system", "content": self.template.get_init_msg()}]
+        if self.verbose:
+            print(f"System Message:\n {self.dialogue[0]['content']}")
+
 
     def add_to_dialogue(self, handicap: str):
         self.dialogue.append({"role": "system", "content": handicap})
 
-    def forward(self, query, observation, reward, available_actions) -> Tuple[str, bool]:
+    def forward(self, query, observation, reward, available_actions, verbose=False) -> Tuple[str, bool]:
         # Append response to dialogue
         if self.dialogue[-1]["role"] == "system":
             # First Turn
@@ -97,6 +102,9 @@ class ChatGPTPolicy(BasePolicy):
                 self.dialogue = self.dialogue[:2] + self.dialogue[-self.dialogue_limit:]
 
         # Retrieve Action from ChatGPT
+        if self.verbose:
+            print(f"len(self.dialogue): {len(self.dialogue)}")
+            print(f"self.dialogue[-1]: {self.dialogue[-1]}")
         actions = ChatGPT(self.dialogue, model=self.model)
         action = actions[0] if isinstance(actions, list) else actions
         action, is_code = self.action_parser(action)
