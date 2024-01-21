@@ -39,7 +39,7 @@ def main(args):
     data_path = ENV_MAP[env]["data_path"] if "data_path" in ENV_MAP[env] else None
     preprocess = ENV_MAP[env]["preprocess"] if "preprocess" in ENV_MAP[env] else None
 
-    env = ENV_MAP[env]["env"](image_name, data_path=data_path, verbose=True, preprocess=preprocess)
+    env = ENV_MAP[env]["env"](image_name, data_path=data_path, verbose=True, preprocess=preprocess, traj_dir="./traj_dir/")
     human_policy = HumanPolicy() if "human" in args.mode else None
     ai_policy = None
     if "ai" in args.mode:
@@ -68,6 +68,8 @@ def main(args):
                     action = human_policy.forward(query, ai_action, env.get_available_actions())
                     if action == "":
                         action = ai_action
+                else:
+                    raise ValueError(f"mode {args.mode!r} is not supported")
 
                 print(f"-- Action: {action}")
                 obs, reward, done, info = env.step(action)

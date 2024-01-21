@@ -133,6 +133,7 @@ dmypy.json
 
 # Custom
 logs*/
+traj_dir/
 keys.cfg
 notebooks/playground.ipynb
 data/swe-bench/swe-bench.json
