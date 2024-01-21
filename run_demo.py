@@ -4,7 +4,11 @@ import readline
 from intercode.envs import (
     BashEnv, PythonEnv, SqlEnv, CTFEnv, SWEEnv
 )
-from experiments.policies import HumanPolicy
+from experiments.policies import (
+    HumanPolicy, ChatGPTPolicy
+)
+from experiments.utils import HANDICAP_MAP, PROMPT_MAP, SETTING_MAP, LANG_BY_ENV
+
 from typing import Dict, List
 
 
@@ -18,7 +22,7 @@ def preprocess_sql(record: Dict) -> List:
     db = record["db"]
     return [f"use {db}"]
 
-DEMO_MAP = {
+ENV_MAP = {
     "bash": {"env": BashEnv, "image_name": "intercode-nl2bash", "data_path": "./data/nl2bash/nl2bash_fs_1.json"},
     "python": {"env": PythonEnv, "image_name": "intercode-python", "data_path": "./data/python/mbpp/ic_mbpp.json"},
     "sql": {"env": SqlEnv, "image_name": "docker-env-sql", "data_path": "./data/sql/bird/ic_bird.json", "preprocess": preprocess_sql},
@@ -27,26 +31,50 @@ DEMO_MAP = {
 }
 
 
-def main(demo: str):
-    if demo not in DEMO_MAP:
-        raise ValueError(f"Demo {demo} not supported (Specify one of [bash, python, sql])")
-    image_name = DEMO_MAP[demo]["image_name"]
-    data_path = DEMO_MAP[demo]["data_path"] if "data_path" in DEMO_MAP[demo] else None
-    preprocess = DEMO_MAP[demo]["preprocess"] if "preprocess" in DEMO_MAP[demo] else None
+def main(args):
+    env = args.env
+    if env not in ENV_MAP:
+        raise ValueError(f"env {env} not supported (Specify one of [bash, python, sql])")
+    image_name = ENV_MAP[env]["image_name"]
+    data_path = ENV_MAP[env]["data_path"] if "data_path" in ENV_MAP[env] else None
+    preprocess = ENV_MAP[env]["preprocess"] if "preprocess" in ENV_MAP[env] else None
 
-    env = DEMO_MAP[demo]["env"](image_name, data_path=data_path, verbose=True, preprocess=preprocess)
-    
+    env = ENV_MAP[env]["env"](image_name, data_path=data_path, verbose=True, preprocess=preprocess)
+    human_policy = HumanPolicy() if "human" in args.mode else None
+    ai_policy = None
+    if "ai" in args.mode:
+        ai_policy = ChatGPTPolicy(language=LANG_BY_ENV[args.env], setting=SETTING_MAP[args.env],
+            template=args.template, dialogue_limit=args.dialogue_limit, model=args.model, verbose=True)
+
     try:
-        for _ in range(3):
-            env.reset()
-            policy = HumanPolicy()
-            obs = env.observation
-            done = False
+        for idx in range(min(len(env.data_loader), 3)):
+            env.reset(idx)
+            if ai_policy is not None:
+                ai_policy.reset()
+            obs, reward, done = None, None, False
             query = env.query if hasattr(env, "query") else None
-
+            print(f'------\nQuery {idx}: {env.query}')
+            turn = 0
             while not done:
-                action = policy.forward(query, obs, env.get_available_actions())
+                print(f"- Turn {turn}")
+                turn += 1
+                if args.mode == "human":
+                    action = human_policy.forward(query, obs, env.get_available_actions())
+                elif args.mode == "ai":
+                    action, _ = ai_policy.forward(query, obs, reward, env.get_available_actions())
+                elif args.mode == "human_ai":
+                    ai_action, _ = ai_policy.forward(query, obs, reward, env.get_available_actions())
+                    print(f"-- AI Action: {ai_action}")
+                    action = human_policy.forward(query, ai_action, env.get_available_actions())
+                    if action == "":
+                        action = ai_action
+
+                print(f"-- Action: {action}")
                 obs, reward, done, info = env.step(action)
+                if reward == 1:
+                    print("Solved!")
+                    done = True
+
     except KeyboardInterrupt:
         print("Exiting InterCode environment...")
     finally:
@@ -54,7 +82,13 @@ def main(demo: str):
 
 
 if __name__ == '__main__':
-    argparse = argparse.ArgumentParser()
-    argparse.add_argument("demo", type=str, help="Environment demo to run [bash, python, sql]")
-    args = argparse.parse_args()
-    main(**vars(args))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("env", type=str, choices=["bash", "python", "sql", "ctf", "swe"], help="Environment to run [bash, python, sql, ctf, swe]", default="bash")
+    parser.add_argument("--mode", type=str, choices=["human", "ai", "human_ai"], help="Mode about the model", default="human_ai")
+    parser.add_argument('--model', type=str, help="model to use for AI policy", default="gpt-4-1106-preview")
+    parser.add_argument('--dialogue_limit', type=int, help='maximum number of turns in the policy\'s dialogue to keep, only used when the mode is "ai"', default=999)
+    parser.add_argument('--max_turns', type=int, help='max number of interaction turns, only used when the mode is "ai"', default=999)
+    parser.add_argument('--template', type=str, help="template to use for prompting strategy", default="v2")
+
+    args = parser.parse_args()
+    main(args)

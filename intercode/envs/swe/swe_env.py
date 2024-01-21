@@ -1,9 +1,11 @@
 import os
 
 from intercode.envs import (
-  BashEnv, IntercodeEnv, AGENT_OBS, REWARD
+  BashEnv, IntercodeEnv, AGENT_OBS, REWARD, ACTION_EXEC
 )
 from typing import Dict, Tuple
+
+SPECIAL_COMMANDS = ("COMMAND", "SUBMIT", "QUIT", "PATCH")
 
 class SWEEnv(BashEnv):
     """Gym environmnet for SWE-bench"""
@@ -11,19 +13,46 @@ class SWEEnv(BashEnv):
 
     def __init__(self, image_name: str, **kwargs):
         IntercodeEnv.__init__(self, image_name, **kwargs)
-        self.token = os.environ.get("GITHUB_TOKEN", "git")
-    
+        self.token = os.environ.get("GITHUB_TOKENS")
+        if self.token is None:
+            raise ValueError("'GITHUB_TOKENS' is not specified as environment variable.")
+
+    def apply_patch(self, patch: str, rm=True) -> bool:
+        patch_path = "patch.diff"
+        for i, line in enumerate(patch.split("\n")):
+            write_symbol = ">>" if i else ">"
+            command = f"echo '{line}' {write_symbol} {patch_path}"
+            exec_result = self.container.exec_run(
+                self.clean_cmd(command),
+                workdir=self.workdir
+            )
+            if exec_result.exit_code != 0:
+                raise ValueError(f"failed to write patch: {exec_result}")
+
+        # Apply patch to testbed directory
+        exec_result = self.container.exec_run(
+            self.clean_cmd(f"git apply -v {patch_path}"),
+            workdir=self.workdir
+        )
+        if rm:
+            self.container.exec_run(
+                self.clean_cmd(f"rm {patch_path}"),
+                workdir=self.workdir
+            )
+        return exec_result
+
     def reset_container(self) -> None:
         self.workdir = "/"
-        folders = self.container.exec_run(self.clean_cmd('ls')).output.decode("utf-8")
+        folders = self.container.exec_run(self.clean_cmd('ls')).output.decode("utf-8")        
 
         # Clone repository if not already cloned
         repo_name = self.record['repo'].replace("/", "__")
         if repo_name not in folders:
             self.logger.info(f"{repo_name} not found in container, cloning...")
-            clone_cmd = f"git clone https://{self.token}@github.com/swe-bench/{repo_name}.git"
-            self.container.exec_run(self.clean_cmd(clone_cmd))
-        
+            clone_cmd = f"git clone https://{self.token}@github.com/ziyuewang25/{repo_name}.git"
+            result = self.container.exec_run(self.clean_cmd(clone_cmd))
+            if result.exit_code != 0:
+                raise ValueError("failed to clone repo")
         # TODO(?): Add logic for installing conda environment
         
         # Clean repository of any modifications + Checkout base commit
@@ -36,11 +65,88 @@ class SWEEnv(BashEnv):
             self.clean_cmd(f"git -c advice.detachedHead=false checkout {self.record['base_commit']}"),
             workdir=self.workdir)
 
+        exec_result = self.apply_patch(self.record['tests']['patch'])        
+        if exec_result.exit_code != 0:
+            raise ValueError(f"failed to apply patch: {exec_result}")
+        self.logger.info("Successfully applied test patch")
+
         # TODO(?): Add logic to install repository at base commit
 
+    def step(self, action: str) -> Tuple[str, int, bool, Dict]:
+        """
+        Runs given action in environment and returns corresponding output
+        
+        Args:
+            action (`str`) - command to run in bash shell
+        
+        Returns:
+            observation (`str`) - standard output
+            reward (`float`) - value between 0 and 1 quantifying correctness of output + environment state
+            done (`bool`) - whether task is over
+            info (`dict`) - additional information (e.g. debugging information)
+        """
+        if not any(x in action for x in SPECIAL_COMMANDS):
+            self.observation = f"Your action doesn't contain {SPECIAL_COMMANDS}"
+
+        if sum(x in action for x in SPECIAL_COMMANDS) > 1:
+            self.observation = f"Your action contain more than 1 special command. Only one of {SPECIAL_COMMANDS} is allowed per action."
+            return self.observation, 0, False, self.info
+
+        if "COMMAND" in action:
+            if "nano " in action:
+                self.observation = "You cannot manually edit the file. You are only allowed to use PATCH with the desired diff."
+                return self.observation, 0, False, self.info
+            if "rm " in action:
+                self.observation = "You cannot remove any file. You are only allowed to use PATCH with the desired diff."
+                return self.observation, 0, False, self.info
+            self.exec_action(self.extract_command(action))
+
+        if "PATCH" in action:
+            patch = self.extract_patch(action)
+            self.info["patch"] = patch
+            file = patch.split("---")[1].split("+++")[0].split("/")[-1].strip()
+            if "test_" in file or "_test.py" in file:
+                self.observation = "You cannot manually edit test file."
+                return self.observation, 0, False, self.info
+
+            exit_code, output = self.apply_patch(patch, rm=False)
+            self.observation = output.decode("utf-8")
+            self.info[ACTION_EXEC] = exit_code == 0
+
+        if "SUBMIT" in action:
+            self.exec_action("pytest")
+            reward, info = self.get_reward()
+            if self.traj_dir is not None:
+                self.save_trajectory()
+            return self.observation, reward, True, info
+
+        if "QUIT" in action:
+            self.trajectory.append((action, ""))
+            return "QUIT", 0, True, self.info 
+        
+            
+        self.logger.info(f"Action: {action}")
+        self.logger.info(f"Observation: {self.observation}")
+        self.trajectory.append((action, self.observation))
+        return self.observation, 0, False, self.info
+
+    def extract_command(self, action):
+        exec_action = action.split("COMMAND:")[1].lstrip()
+        if "`" in exec_action:
+            exec_action = action.split("`")[1]
+        return exec_action
+
+    def extract_patch(self, action):
+        patch = action.split("PATCH:")[1].lstrip()
+        if "```" in patch:
+            patch = patch.split("```")[1]
+        return patch
+
     def get_reward(self) -> Tuple[float, Dict]:
-        # TODO(?): Add evaluation (Apply test patch + run testing script + parse logs & get results)
-        return 0, {}
+        reward, info = 1, {}
+        if "failed" in self.observation:
+            reward = 0
+        return reward, info
     
     def close(self):
         self.logger.info("Beginning environment shutdown...")

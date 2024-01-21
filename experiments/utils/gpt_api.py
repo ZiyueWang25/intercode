@@ -58,9 +58,9 @@ def ChatGPT(messages, model="gpt-3.5-turbo", num_samples=1):
     )
     candidates = []
     for candidate in response.choices:
-        z = candidate.message.content
-        pred = re.sub("\n"," ", z)
-        candidates.append(pred.strip())
+        # z = candidate.message.content
+        # pred = re.sub("\n"," ", z)
+        candidates.append(candidate.message.content)
     return candidates
     
 if __name__ == "__main__":

@@ -381,48 +381,46 @@ class SWETemplate(PromptTemplate):
     def __init__(self, language: str, setting: str):
         super().__init__(language, setting)
         self.message_history = ""
+        self.guidance = "Explain your thoughts and use only one of COMMAND, PATCH, SUBMIT or QUIT with your intented commands and patch afterwards to tell the next step."
     
     def get_init_msg(self):
         return """You are an exceptional and helpful software engineer and you are asked to fix a feature request or bug on a Github \
 repository. You have access to the request, code in the repository and terminal output. Initially, some tests are failed and in the end \
-they should be successful after fixing the request. You can use `cat`, `ls`, `pytest` and etc to view the code and check the test results. \
-You are not allowed to modify the tests and you can use the following special commands to interact with the terminal.
+they should be successful after you fix the request. You can use commands `cat`, `ls`, `pytest` and etc to view the code and check the test results. \
+You are not allowed to modify the tests and you must use the following special commands (COMMAND, PATCH, SUBMIT, QUIT) to interact with the terminal.
 
-- `COMMAND:xxx”: Run command xxx. The command can be `cat`, `ls`, `pytest` and etc. It can also be applying a patch, for example: `git apply xxx` \
-applies patch xxx to the codebase. The patch format is following the standard Github patch format without commit specific metadata. \
-Example content is below: 
-```
-diff --git a/foo.c b/foo.c
---- a/foo.c
-+++ b/foo.c
-@@ -1,5 +1,5 @@
- #include <string.h>
-
- int check (char *string) {
--    return !strcmp(string, "ok");
-+    return (string != NULL) && !strcmp(string, "ok");
- }
-```
+- `COMMAND: xxx”: Run command xxx. The command can be `cat`, `ls`, `pytest` and etc.
+- `PATCH: xxx": Apply patch xxx. The patch format is following the standard Github patch format without commit specific metadata. Remember, you should \
+include proper line breaker ("\\n"), otherwise the diff cannot be applied successfully. Example content is: \
+```diff --git a/bar.c b/bar.c\n--- a/bar.c\n+++ b/bar.c\n@@ -1,5 +1,5 @@\n #include <string.h>\n\n int check (char *string) {\n-    return !strcmp(string, "ok");\n+    return (string != NULL) && !strcmp(string, "ok");\n }\n```
 - `SUBMIT`: After you feel confident about the solution. You can call `SUBMIT` to submit your solution.
 - `QUIT: If you feel incapable of solving the request, you can call `QUIT` to leave the task.
 
-You will be given the feature request in the beginning. Here is an example feature request and patch to fix it.
-“Request: Adjust foo.py so that it can pass the test”
-“PATCH:diff --git a/foo.py b/foo.py\n--- a/foo.py\n+++ b/foo.py\n@@ -1,4 +1,4 @@\n # example toy functions to test LLM agent fixing code ability\n \n def double(x):\n-  return x + 1\n+  return x * 2\n”
+You will be given the feature request in the beginning. Here is an example feature request and relevant interaction to fix it.
+- Terminal: “Here is the feature request or bug: “Adjust bar.py so that it can pass the test\n\n””
+- You: "First, I will check the existing files in the repository to see if there is a file named `bar.py`. COMMAND: ls"
+- Terminal: "Execution Output:README\nfoo.py\ntest_foo.py"
+- You: "We have a file named "bar.py" in the repository. Now, let's take a look at the content of "bar.py" to understand what needs to be adjusted. COMMAND: cat bar.py"
+- ....
+- You: “Apply patch on bar.py to fix it. PATCH:```diff --git a/bar.py b/bar.py\n--- a/bar.py\n+++ b/bar.py\n@@ -1,4 +1,4 @@\n # example toy functions to test LLM agent fixing code ability\n \n def func(x):\n-  return x + 1\n+  return x + 2\n```”
+- Terminal: "Execution Output:Applied patch successfuly!"
+- You: "Let's verify if the test can pass now. COMMAND: pytest"
+- Terminal: "Execution Output:....."
+- You: "It should be good now. SUBMIT."
 
-Before every action (COMMAND, SUBMIT or QUIT) you want to take, please explain your thoughts.
+Before every action (COMMAND, PATCH, SUBMIT or QUIT) you want to take, please explain your thoughts.
 """
 
     def get_query_msg(self, query):
         return f"""Here is the feature request or bug: “{query}”
-Please fix it independently."""
+Please fix it independently. {self.guidance}"""
 
     def get_obs_msg(self, observation, reward):
         if isinstance(observation, str) and observation == "" or isinstance(observation, list) and len(observation) == 0:
             observation = "No output"
-        return f"""{self.setting} Output:\n{observation}
+        return f"""Execution Output:{observation}
 
-Explain your thoughts and use COMMAND, SUBMIT or QUIT to tell the next step."""
+{self.guidance}"""
 
 
 # completion

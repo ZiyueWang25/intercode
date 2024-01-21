@@ -107,9 +107,9 @@ class ChatGPTPolicy(BasePolicy):
             print(f"self.dialogue[-1]: {self.dialogue[-1]}")
         actions = ChatGPT(self.dialogue, model=self.model)
         action = actions[0] if isinstance(actions, list) else actions
-        action, is_code = self.action_parser(action)
+        # action, is_code = self.action_parser(action)
         self.dialogue.append({"role": "assistant", "content": action})
-        return action, is_code
+        return action, True
     
 class PalmChatPolicy(BasePolicy):
     def __init__(self, language: str, setting: str, template: str, dialogue_limit: int = None, model: str = "models/chat-bison-001", response_limit: int = 1000):
