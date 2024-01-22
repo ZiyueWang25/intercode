@@ -136,5 +136,6 @@ logs*/
 traj_dir/
 keys.cfg
 notebooks/playground.ipynb
+notebooks/check_dataset.ipynb
 data/swe-bench/swe-bench.json
 data/swe-bench/ToyExamples_dataset.json
