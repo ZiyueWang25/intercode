@@ -3,6 +3,8 @@ import os
 from intercode.envs import (
   BashEnv, IntercodeEnv, AGENT_OBS, REWARD, ACTION_EXEC
 )
+from intercode.envs.swe import install
+
 from typing import Dict, Tuple
 
 SPECIAL_COMMANDS = ("COMMAND", "SUBMIT", "QUIT", "PATCH")
@@ -14,6 +16,7 @@ class SWEEnv(BashEnv):
     def __init__(self, image_name: str, **kwargs):
         IntercodeEnv.__init__(self, image_name, **kwargs)
         self.token = os.environ.get("GITHUB_TOKENS")
+        self.installer = install.Installer(self.logger, self.container)
         if self.token is None:
             raise ValueError("'GITHUB_TOKENS' is not specified as environment variable.")
 
@@ -49,11 +52,16 @@ class SWEEnv(BashEnv):
         repo_name = self.record['repo'].replace("/", "__")
         if repo_name not in folders:
             self.logger.info(f"{repo_name} not found in container, cloning...")
-            clone_cmd = f"git clone https://{self.token}@github.com/ziyuewang25/{repo_name}.git"
-            result = self.container.exec_run(self.clean_cmd(clone_cmd))
-            if result.exit_code != 0:
-                raise ValueError("failed to clone repo")
-        # TODO(?): Add logic for installing conda environment
+            if "ZiyueWang25" in repo_name:
+                clone_cmd = f"git clone https://github.com/ziyuewang25/{repo_name}.git"
+            else:
+                clone_cmd = f"git clone https://github.com/swe-bench/{repo_name}.git"
+
+            code, output = self.container.exec_run(self.clean_cmd(clone_cmd))
+            if code != 0:
+                raise ValueError(f"failed to clone repo: {output.decode()}")
+
+        self.installer.install_pkg(self.record)
         
         # Clean repository of any modifications + Checkout base commit
         self.workdir = f"/{repo_name}/"
