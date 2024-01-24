@@ -11,8 +11,8 @@ class Installer:
     def __init__(self, logger, container:Container):
         self.path_conda = os.path.abspath("/miniconda3")
         self.conda_bin_path = os.path.join(self.path_conda, "bin")
-        self.path_activate = os.path.join(self.conda_bin_path, "bin", "activate")
-        self.conda_exec_cmd = os.path.join(self.path_conda, "bin", "conda")
+        self.path_activate = os.path.join(self.conda_bin_path, "activate")
+        self.conda_exec_cmd = os.path.join(self.conda_bin_path, "conda")
         self.logger = logger
         self.container = container
 
@@ -47,6 +47,18 @@ class Installer:
             self.logger.warning(f'" in action: {action}. You should update it to use \' ')
         return f"{entrypoint} -c \"{action.strip()}\""
 
+    def activate_conda(self, env_name):
+        code, output = self.container.exec_run(self.clean_cmd(f". {self.path_activate} {env_name}"))
+        if code != 0:
+            raise ValueError(f"failed to activate: {output.decode()}")
+        self.container.exec_run(self.clean_cmd(f"conda deactivate"))
+        if code != 0:
+            raise ValueError(f"failed to deactivate base: {output.decode()}")
+        self.container.exec_run(self.clean_cmd(f"conda activate {env_name}"))
+        if code != 0:
+            raise ValueError(f"failed to activate env: {output.decode()}")
+
+
     def install_pkg(self, instance):
         repo = instance["repo"]
         version = instance["version"]
@@ -57,6 +69,9 @@ class Installer:
         # Name for both environment and github repo
         env_name = f"{repo_prefix}__{version}"
         if env_name in self.env_list:
+            self.logger.info(f"Conda env: {env_name} exists, activate it")
+            self.activate_conda(env_name)
+            self.logger.info(f"Activate {env_name} successfully")
             return
 
         # Create conda environment according to install instructinos
@@ -66,11 +81,8 @@ class Installer:
             code, output = self.container.exec_run(self.clean_cmd(f"{self.conda_exec_cmd} create -n {env_name} python={install['python']} -y"))
             if code != 0:
                 raise ValueError(f"failed to install conda: {output.decode()}")
-            code, output = self.container.exec_run(self.clean_cmd(f". {self.path_activate} {env_name}"))
-            if code != 0:
-                raise ValueError(f"failed to activate repo: {output.decode()}")
-            self.container.exec_run(self.clean_cmd(f"conda deactivate"))
-            self.container.exec_run(self.clean_cmd(f"conda activate {env_name}"))
+            self.activate_conda(env_name)
+
 
             # Install dependencies
             path_to_reqs = get_requirements(instance, self.testbed)

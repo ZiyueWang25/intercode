@@ -1,4 +1,8 @@
+import io
 import os
+import tarfile
+
+from docker.models.containers import Container
 
 from intercode.envs import (
   BashEnv, IntercodeEnv, AGENT_OBS, REWARD, ACTION_EXEC
@@ -8,6 +12,16 @@ from intercode.envs.swe import install
 from typing import Dict, Tuple
 
 SPECIAL_COMMANDS = ("COMMAND", "SUBMIT", "QUIT", "PATCH")
+
+def copy_to_container(container: Container, src: str, dst_dir: str):
+    """ src shall be an absolute path """
+    stream = io.BytesIO()
+    with tarfile.open(fileobj=stream, mode='w|') as tar, open(src, 'rb') as f:
+        info = tar.gettarinfo(fileobj=f)
+        info.name = os.path.basename(src)
+        tar.addfile(info, f)
+
+    container.put_archive(dst_dir, stream.getvalue())
 
 class SWEEnv(BashEnv):
     """Gym environmnet for SWE-bench"""
@@ -20,29 +34,33 @@ class SWEEnv(BashEnv):
         if self.token is None:
             raise ValueError("'GITHUB_TOKENS' is not specified as environment variable.")
 
-    def apply_patch(self, patch: str, rm=True) -> bool:
-        patch_path = "patch.diff"
-        for i, line in enumerate(patch.split("\n")):
-            write_symbol = ">>" if i else ">"
-            command = f"echo '{line}' {write_symbol} {patch_path}"
-            exec_result = self.container.exec_run(
-                self.clean_cmd(command),
-                workdir=self.workdir
-            )
-            if exec_result.exit_code != 0:
-                raise ValueError(f"failed to write patch: {exec_result}")
+    def apply_patch(self, patch: str, rm=True):
+        orig_patch_path = "./patch.diff"
+        patch_path = os.path.abspath(orig_patch_path)
+        with open(patch_path, "w") as f:
+            f.write(patch)
+        copy_to_container(self.container, patch_path, self.workdir)
+        exit_code, output = self.container.exec_run(
+            self.clean_cmd(f"cat {orig_patch_path}"),
+            workdir=self.workdir
+        )
+        if exit_code != 0:
+            raise ValueError(f"patch.diff doesn't exist: {output.decode()}")
 
         # Apply patch to testbed directory
         exec_result = self.container.exec_run(
-            self.clean_cmd(f"git apply -v {patch_path}"),
+            self.clean_cmd(f"git apply -v {orig_patch_path}"),
             workdir=self.workdir
         )
+        if exec_result.exit_code != 0:
+            raise ValueError(f"failed to apply patch: {exec_result}")
+        self.logger.info("Successfully applied patch")
+        os.remove(patch_path)
         if rm:
             self.container.exec_run(
-                self.clean_cmd(f"rm {patch_path}"),
+                self.clean_cmd(f"rm {orig_patch_path}"),
                 workdir=self.workdir
             )
-        return exec_result
 
     def reset_container(self) -> None:
         self.workdir = "/"
@@ -73,12 +91,7 @@ class SWEEnv(BashEnv):
             self.clean_cmd(f"git -c advice.detachedHead=false checkout {self.record['base_commit']}"),
             workdir=self.workdir)
 
-        exec_result = self.apply_patch(self.record['tests']['patch'])        
-        if exec_result.exit_code != 0:
-            raise ValueError(f"failed to apply patch: {exec_result}")
-        self.logger.info("Successfully applied test patch")
-
-        # TODO(?): Add logic to install repository at base commit
+        self.apply_patch(self.record['tests']['patch'], rm=False)
 
     def step(self, action: str) -> Tuple[str, int, bool, Dict]:
         """
