@@ -34,34 +34,6 @@ class SWEEnv(BashEnv):
         if self.token is None:
             raise ValueError("'GITHUB_TOKENS' is not specified as environment variable.")
 
-    def apply_patch(self, patch: str, rm=True):
-        orig_patch_path = "./patch.diff"
-        patch_path = os.path.abspath(orig_patch_path)
-        with open(patch_path, "w") as f:
-            f.write(patch)
-        copy_to_container(self.container, patch_path, self.workdir)
-        exit_code, output = self.container.exec_run(
-            self.clean_cmd(f"cat {orig_patch_path}"),
-            workdir=self.workdir
-        )
-        if exit_code != 0:
-            raise ValueError(f"patch.diff doesn't exist: {output.decode()}")
-
-        # Apply patch to testbed directory
-        exec_result = self.container.exec_run(
-            self.clean_cmd(f"git apply -v {orig_patch_path}"),
-            workdir=self.workdir
-        )
-        if exec_result.exit_code != 0:
-            raise ValueError(f"failed to apply patch: {exec_result}")
-        self.logger.info("Successfully applied patch")
-        os.remove(patch_path)
-        if rm:
-            self.container.exec_run(
-                self.clean_cmd(f"rm {orig_patch_path}"),
-                workdir=self.workdir
-            )
-
     def reset_container(self) -> None:
         self.workdir = "/"
         folders = self.container.exec_run(self.clean_cmd('ls')).output.decode("utf-8")        
@@ -127,7 +99,7 @@ class SWEEnv(BashEnv):
             self.info["patch"] = patch
             file = patch.split("---")[1].split("+++")[0].split("/")[-1].strip()
             if "test_" in file or "_test.py" in file:
-                self.observation = "You cannot manually edit test file."
+                self.observation = "You cannot edit test file."
                 return self.observation, 0, False, self.info
 
             exit_code, output = self.apply_patch(patch, rm=False)
@@ -141,15 +113,43 @@ class SWEEnv(BashEnv):
                 self.save_trajectory()
             return self.observation, reward, True, info
 
-        if "QUIT" in action:
+        if "SKIP" in action:
             self.trajectory.append((action, ""))
-            return "QUIT", 0, True, self.info 
+            return "SKIP", 0, True, self.info 
         
             
         self.logger.info(f"Action: {action}")
         self.logger.info(f"Observation: {self.observation}")
         self.trajectory.append((action, self.observation))
         return self.observation, 0, False, self.info
+
+    def apply_patch(self, patch: str, rm=True):
+        orig_patch_path = "./patch.diff"
+        patch_path = os.path.abspath(orig_patch_path)
+        with open(patch_path, "w") as f:
+            f.write(patch)
+        copy_to_container(self.container, patch_path, self.workdir)
+        exit_code, output = self.container.exec_run(
+            self.clean_cmd(f"cat {orig_patch_path}"),
+            workdir=self.workdir
+        )
+        if exit_code != 0:
+            raise ValueError(f"patch.diff doesn't exist: {output.decode()}")
+
+        # Apply patch to testbed directory
+        exec_result = self.container.exec_run(
+            self.clean_cmd(f"git apply -v {orig_patch_path}"),
+            workdir=self.workdir
+        )
+        if exec_result.exit_code != 0:
+            raise ValueError(f"failed to apply patch: {exec_result}")
+        self.logger.info("Successfully applied patch")
+        os.remove(patch_path)
+        if rm:
+            self.container.exec_run(
+                self.clean_cmd(f"rm {orig_patch_path}"),
+                workdir=self.workdir
+            )
 
     def extract_command(self, action):
         exec_action = action.split("COMMAND:")[1].lstrip()

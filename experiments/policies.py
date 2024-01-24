@@ -84,7 +84,7 @@ class ChatGPTPolicy(BasePolicy):
     def add_to_dialogue(self, handicap: str):
         self.dialogue.append({"role": "system", "content": handicap})
 
-    def forward(self, query, observation, reward, available_actions, verbose=False) -> Tuple[str, bool]:
+    def forward(self, query, observation, reward, available_actions) -> Tuple[str, bool]:
         # Append response to dialogue
         if self.dialogue[-1]["role"] == "system":
             # First Turn

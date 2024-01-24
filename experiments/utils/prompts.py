@@ -381,20 +381,20 @@ class SWETemplate(PromptTemplate):
     def __init__(self, language: str, setting: str):
         super().__init__(language, setting)
         self.message_history = ""
-        self.guidance = "Explain your thoughts and use only one of COMMAND, PATCH, SUBMIT or QUIT with your intented commands and patch afterwards to tell the next step."
+        self.guidance = "Explain your thoughts and use only one of COMMAND, PATCH, SUBMIT or SKIP with your intented commands and patch afterwards to tell the next step."
     
     def get_init_msg(self):
         return """You are an exceptional and helpful software engineer and you are asked to fix a feature request or bug on a Github \
 repository. You have access to the request, code in the repository and terminal output. Initially, some tests are failed and in the end \
 they should be successful after you fix the request. You can use commands `cat`, `ls`, `pytest` and etc to view the code and check the test results. \
-You are not allowed to modify the tests and you must use the following special commands (COMMAND, PATCH, SUBMIT, QUIT) to interact with the terminal.
+You are not allowed to modify the tests and you must use the following special commands (COMMAND, PATCH, SUBMIT, SKIP) to interact with the terminal.
 
 - `COMMAND: xxx”: Run command xxx. The command can be `cat`, `ls`, `pytest` and etc.
 - `PATCH: xxx": Apply patch xxx. The patch format is following the standard Github patch format without commit specific metadata. Remember, you should \
 include proper line breaker ("\\n"), otherwise the diff cannot be applied successfully. Example content is: \
 ```diff --git a/bar.c b/bar.c\n--- a/bar.c\n+++ b/bar.c\n@@ -1,5 +1,5 @@\n #include <string.h>\n\n int check (char *string) {\n-    return !strcmp(string, "ok");\n+    return (string != NULL) && !strcmp(string, "ok");\n }\n```
 - `SUBMIT`: After you feel confident about the solution. You can call `SUBMIT` to submit your solution.
-- `QUIT: If you feel incapable of solving the request, you can call `QUIT` to leave the task.
+- `SKIP: If you feel incapable of solving the request, you can call `SKIP` to leave the task.
 
 You will be given the feature request in the beginning. Here is an example feature request and relevant interaction to fix it.
 - Terminal: “Here is the feature request or bug: “Adjust bar.py so that it can pass the test\n\n””
@@ -408,7 +408,7 @@ You will be given the feature request in the beginning. Here is an example featu
 - Terminal: "Execution Output:....."
 - You: "It should be good now. SUBMIT."
 
-Before every action (COMMAND, PATCH, SUBMIT or QUIT) you want to take, please explain your thoughts.
+Before every action (COMMAND, PATCH, SUBMIT or SKIP) you want to take, please explain your thoughts.
 """
 
     def get_query_msg(self, query):

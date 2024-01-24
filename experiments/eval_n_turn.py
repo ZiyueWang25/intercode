@@ -1,6 +1,6 @@
 import argparse, json, os, re
 from intercode.envs import (
-    BashEnv, CTFEnv, PythonEnv, SqlEnv, ACTION_EXEC, AGENT_OBS
+    BashEnv, CTFEnv, PythonEnv, SqlEnv, SWEEnv, ACTION_EXEC, AGENT_OBS
 )
 from tqdm import tqdm
 from typing import Dict, List
@@ -53,6 +53,9 @@ class ExperimentWrapper():
         elif args.env == 'ctf':
             self.env = CTFEnv(image_name=args.image_name,
                 data_path=args.data_path, preprocess=preprocess_ctf)
+        elif args.env == 'swe':
+            self.env = SWEEnv(image_name=args.image_name,
+                              data_path=args.data_path)
         else:
             raise ValueError(f'Environment {args.env} not recognized')
         
@@ -87,8 +90,8 @@ class ExperimentWrapper():
                 # Reset variables per task
                 self.env.reset(idx)
                 self.policy.reset()
-                observation, reward, valid_action = None, None, None
-                turn_history = {"actions": [], "observations": [], "rewards": [], "valid_action": []}
+                observation, reward, is_valid_action = None, None, None
+                turn_history = {"actions": [], "observations": [], "rewards": [], "is_valid_action": []}
                 record = self.env.data_loader.get(idx)
 
                 # Add Handicap
@@ -108,14 +111,15 @@ class ExperimentWrapper():
                     except (ValueError, TypeError) as e:
                         print(f"[ERROR] Index {idx}: {e}")
                         # Logging
-                        turn_history["actions"].append("blocked")
+                        turn_history["actions"].append("blocked: {e}")
                         turn_history["rewards"].append(0)
                         break
 
                     if not is_code:
                         reward = 0
                         observation = self.policy.template.get_retry_msg()
-                        valid_action = False
+                        is_valid_action = False
+
                     else:
                         if isinstance(self.env, PythonEnv):
                             if action.startswith("def"):
@@ -144,10 +148,10 @@ class ExperimentWrapper():
                         else:
                             if action != "skip":
                                 observation, reward, done, info = self.env.step(action)
-                                valid_action = info[ACTION_EXEC]
+                                is_valid_action = info[ACTION_EXEC]
                             else:
                                 observation, reward, done, info = "skipped", 0, True, {}
-                                valid_action = True
+                                is_valid_action = True
                             if not isinstance(self.env, CTFEnv):
                                 _, reward, done, info = self.env.step("submit")
                             else:
@@ -166,7 +170,7 @@ class ExperimentWrapper():
                     turn_history["actions"].append(action)
                     turn_history["observations"].append(str(observation)) # To avoid serialization issues
                     turn_history["rewards"].append(reward)
-                    turn_history["valid_action"].append(valid_action)
+                    turn_history["is_valid_action"].append(is_valid_action)
 
                     # End episode upon perfect reward
                     if reward == 1 or action.lower() == "skip":
