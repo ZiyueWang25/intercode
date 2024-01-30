@@ -21,6 +21,7 @@ handler.setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 logger.addHandler(handler)
+# TODO: save logger results to a central place for future reference
 
 class IntercodeEnv(ABC, gym.Env):
     """Base class for Intercode environments"""
