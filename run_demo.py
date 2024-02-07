@@ -1,3 +1,8 @@
+"""Run demo for each environment.
+
+Example usage:
+python run_demo.py swe --mode=human_ai --model=claude --template=swe  --use_toy_example
+"""
 import argparse
 import readline
 
@@ -5,7 +10,7 @@ from intercode.envs import (
     BashEnv, PythonEnv, SqlEnv, CTFEnv, SWEEnv
 )
 from experiments.policies import (
-    HumanPolicy, ChatGPTPolicy
+    HumanPolicy, ChatGPTPolicy, ChatAnthropicPolicy
 )
 from experiments.utils import HANDICAP_MAP, PROMPT_MAP, SETTING_MAP, LANG_BY_ENV
 
@@ -35,6 +40,9 @@ def main(args):
     env = args.env
     if env not in ENV_MAP:
         raise ValueError(f"env {env} not supported (Specify one of [bash, python, sql])")
+    if env == "swe" and args.use_toy_example:
+        print("Use toy example")
+        ENV_MAP["swe"]["data_path"] = "./data/swe-bench/ic_toy_examples.json"
     image_name = ENV_MAP[env]["image_name"]
     data_path = ENV_MAP[env]["data_path"] if "data_path" in ENV_MAP[env] else None
     preprocess = ENV_MAP[env]["preprocess"] if "preprocess" in ENV_MAP[env] else None
@@ -43,8 +51,13 @@ def main(args):
     human_policy = HumanPolicy() if "human" in args.mode else None
     ai_policy = None
     if "ai" in args.mode:
-        ai_policy = ChatGPTPolicy(language=LANG_BY_ENV[args.env], setting=SETTING_MAP[args.env],
-            template=args.template, dialogue_limit=args.dialogue_limit, model=args.model, verbose=True)
+        policy_args = dict(language=LANG_BY_ENV[args.env], setting=SETTING_MAP[args.env],
+                template=args.template, dialogue_limit=args.dialogue_limit, model=args.model, verbose=True)
+
+        if args.model.lower() == "claude":
+            ai_policy = ChatAnthropicPolicy(**policy_args)
+        else:
+            ai_policy = ChatGPTPolicy(**policy_args)
 
     try:
         for idx in range(min(len(env.data_loader), 3)):
@@ -86,8 +99,9 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("env", type=str, choices=["bash", "python", "sql", "ctf", "swe"], help="Environment to run [bash, python, sql, ctf, swe]", default="bash")
+    parser.add_argument('--use_toy_example', action='store_true', help='use toy example in swe environment')
     parser.add_argument("--mode", type=str, choices=["human", "ai", "human_ai"], help="Mode about the model", default="human_ai")
-    parser.add_argument('--model', type=str, help="model to use for AI policy", default="gpt-4-1106-preview")
+    parser.add_argument('--model', type=str, choices=["claude", "gpt-4-1106-preview", "gpt-3.5-turbo"], help="model to use for AI policy", default="gpt-4-1106-preview")
     parser.add_argument('--dialogue_limit', type=int, help='maximum number of turns in the policy\'s dialogue to keep, only used when the mode is "ai"', default=999)
     parser.add_argument('--max_turns', type=int, help='max number of interaction turns, only used when the mode is "ai"', default=999)
     parser.add_argument('--template', type=str, help="template to use for prompting strategy", default="v2")

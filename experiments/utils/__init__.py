@@ -11,6 +11,9 @@ from .prompts import (
     TemplatePlanSolve,
     PROMPT_MAP
 )
+from .anthropic_api import (
+    ChatAnthropic
+)
 from .gpt_api import (
     CompletionGPT,
     ChatGPT

@@ -1,3 +1,10 @@
+MAP_VERSION_TO_INSTALL_TOY_EXAMPLES = {
+    k: {
+        "python": "3.6",
+    }
+    for k in ["0.01"]
+}
+
 MAP_VERSION_TO_INSTALL_SKLEARN = {
     k: {
         "python": "3.6",
@@ -383,6 +390,7 @@ MAP_VERSION_TO_INSTALL_HUMANEVAL= {k: { "python": "3.9" } for k in ['1.0']}
 
 # Constants - Task Instance Instllation Environment
 MAP_VERSION_TO_INSTALL = {
+    "ZiyueWang25/ToyExamples": MAP_VERSION_TO_INSTALL_TOY_EXAMPLES,
     "astropy/astropy": MAP_VERSION_TO_INSTALL_ASTROPY,
     "dbt-labs/dbt-core": MAP_VERSION_TO_INSTALL_DBT_CORE,
     "django/django": MAP_VERSION_TO_INSTALL_DJANGO,
@@ -412,6 +420,7 @@ MAP_REPO_TO_INSTALL = {}
 # Constants - Task Instance Test Frameworks
 TEST_PYTEST = "pytest --no-header -rA --tb=no -p no:cacheprovider"
 MAP_REPO_TO_TEST_FRAMEWORK = {
+    "ZiyueWang25/ToyExamples": TEST_PYTEST,
     "astropy/astropy": TEST_PYTEST,
     "dbt-labs/dbt-core": TEST_PYTEST,
     "django/django": "./tests/runtests.py --verbosity 2",
@@ -437,6 +446,7 @@ MAP_REPO_TO_TEST_FRAMEWORK = {
 
 # Constants - Task Instance Requirements File Paths
 MAP_REPO_TO_REQS_PATHS = {
+    "ZiyueWang25/ToyExamples": [],
     "dbt-labs/dbt-core": ["dev-requirements.txt", "dev_requirements.txt"],
     "django/django": ["tests/requirements/py3.txt"],
     "matplotlib/matplotlib": ["requirements/dev/dev-requirements.txt", "requirements/testing/travis_all.txt"],
