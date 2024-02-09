@@ -30,7 +30,8 @@ class IntercodeDataLoader():
         elif file_ext == "tsv":
             data = pd.read_csv(self.data_path, sep="\t")
         elif file_ext == "json":
-            data = pd.read_json(self.data_path)
+            # keep trailing 0.
+            data = pd.read_json(self.data_path, dtype={'version': str})
         elif file_ext == "pickle" or file_ext == "pkl":
             data = pd.read_pickle(self.data_path)
         else:

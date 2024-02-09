@@ -5,6 +5,7 @@ import re
 from docker.models.containers import Container
 
 from intercode.envs.swe import constants
+from intercode.envs.swe import util
 
 
 class Installer:
@@ -13,6 +14,8 @@ class Installer:
         self.conda_bin_path = os.path.join(self.path_conda, "bin")
         self.path_activate = os.path.join(self.conda_bin_path, "activate")
         self.conda_exec_cmd = os.path.join(self.conda_bin_path, "conda")
+        self.testbed = "./testbed/"
+        os.makedirs(self.testbed, exist_ok=True)
         self.logger = logger
         self.container = container
 
@@ -85,16 +88,15 @@ class Installer:
 
 
             # Install dependencies
-            path_to_reqs = get_requirements(instance, self.testbed)
+            path_to_reqs = get_requirements(instance, self.testbed, self.container)
             cmd = f"pip install -r {path_to_reqs}"
             code, output = self.container.exec_run(self.clean_cmd(cmd))
             if code != 0:
                 raise ValueError(f"failed to install requirements: {output.decode()}")
-            os.remove(path_to_reqs)
         elif pkgs == "environment.yml":
             # Create environment from yml
             path_to_reqs = get_environment_yml(
-                instance, env_name, self.testbed
+                instance, env_name, self.testbed, self.container
             )
             if "no_use_env" in install and install["no_use_env"]:
                 # `conda create` based installation
@@ -146,13 +148,13 @@ class Installer:
             if code != 0:
                 raise ValueError(f"failed to install pip packages: {output.decode()}")
 
-def get_requirements(instance: dict, save_path: str = None):
+def get_requirements(instance: dict, save_path: str, container: Container):
     """
     Get requirements.txt for given task instance
 
     Args:
         instance (dict): task instance
-        save_path (str): If provided, save requirements.txt to this path
+        save_path (str): save requirements.txt to this path
     Returns:
         requirements.txt (str): If save_path given, returns path to saved requirements.txt.
             Otherwise, returns requirements.txt as string
@@ -213,9 +215,11 @@ def get_requirements(instance: dict, save_path: str = None):
     path_to_reqs = os.path.join(save_path, "requirements.txt")
     with open(path_to_reqs, "w") as f:
         f.write(all_reqs)
-    return path_to_reqs
+    util.copy_to_container(container, path_to_reqs, "/")
+    os.remove(path_to_reqs)
+    return "/requirements.txt"
 
-def get_environment_yml(instance: dict, env_name: str, save_path: str = None) -> str:
+def get_environment_yml(instance: dict, env_name: str, save_path, container: Container) -> str:
     """
     Get environment.yml for given task instance
 
@@ -262,5 +266,7 @@ def get_environment_yml(instance: dict, env_name: str, save_path: str = None) ->
     path_to_reqs = os.path.join(save_path, "environment.yml")
     with open(path_to_reqs, "w") as f:
         f.write("\n".join(cleaned))
-    return path_to_reqs
+    util.copy_to_container(container, path_to_reqs, "/")
+    os.remove(path_to_reqs)
+    return "/environment.yml"
 

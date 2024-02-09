@@ -8,20 +8,12 @@ from intercode.envs import (
   BashEnv, IntercodeEnv, AGENT_OBS, REWARD, ACTION_EXEC
 )
 from intercode.envs.swe import install
+from intercode.envs.swe import util
 
 from typing import Dict, Tuple
 
-SPECIAL_COMMANDS = ("COMMAND", "SUBMIT", "QUIT", "PATCH")
+SPECIAL_COMMANDS = ("COMMAND", "SUBMIT", "SKIP", "PATCH")
 
-def copy_to_container(container: Container, src: str, dst_dir: str):
-    """ src shall be an absolute path """
-    stream = io.BytesIO()
-    with tarfile.open(fileobj=stream, mode='w|') as tar, open(src, 'rb') as f:
-        info = tar.gettarinfo(fileobj=f)
-        info.name = os.path.basename(src)
-        tar.addfile(info, f)
-
-    container.put_archive(dst_dir, stream.getvalue())
 
 class SWEEnv(BashEnv):
     """Gym environmnet for SWE-bench"""
@@ -128,7 +120,7 @@ class SWEEnv(BashEnv):
         patch_path = os.path.abspath(orig_patch_path)
         with open(patch_path, "w") as f:
             f.write(patch)
-        copy_to_container(self.container, patch_path, self.workdir)
+        util.copy_to_container(self.container, patch_path, self.workdir)
         exit_code, output = self.container.exec_run(
             self.clean_cmd(f"cat {orig_patch_path}"),
             workdir=self.workdir
