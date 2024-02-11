@@ -1,10 +1,17 @@
-from intercode.envs import (
-    BashEnv, IntercodeEnv, AGENT_OBS, REWARD
-)
-from typing import Dict, Tuple
+from intercode.envs import BashEnv, IntercodeEnv, AGENT_OBS, REWARD
+from typing import Dict, Tuple, List
+
+
+def preprocess_ctf(record: Dict) -> List:
+    cmds = [f"cd /ctf/{record['task_id']}"]
+    if "setup" in record:
+        cmds.append(record["setup"])
+    return cmds
+
 
 class CTFEnv(BashEnv):
     """Gym environment for CTF game"""
+
     name = "ic_ctf"
 
     def __init__(self, image_name: str, **kwargs):
@@ -25,17 +32,19 @@ class CTFEnv(BashEnv):
         self.logger.info(f"Info: {self.info}")
         self.logger.info(f"Reward: {self.reward}")
         return self.reward, self.info
-    
+
     def close(self):
         self.logger.info("Beginning environment shutdown...")
         self.container.stop()
         self.logger.info("Agent container stopped")
-    
+
     def clean_cmd(self, action: str) -> str:
         if any([action.strip().startswith(x) for x in ["python3 -c", "python -c"]]):
             return action
+
         def clean_command(command):
             # Escape single quotes and enclose the command in single quotes
             cleaned_command = "/bin/bash -c '" + command.replace("'", "'\\''") + "'"
             return cleaned_command
+
         return clean_command(action.strip())

@@ -1,10 +1,11 @@
 """Run demo for each environment.
 
 Example usage:
-python run_demo.py swe --mode=human_ai --model=claude --template=swe  --use_toy_example
+python run_demo.py swe --mode=ai --model=claude --template=swe  --use_toy_example
 """
 import argparse
 import readline
+import os
 
 from intercode.envs import (
     BashEnv, PythonEnv, SqlEnv, CTFEnv, SWEEnv
@@ -12,6 +13,7 @@ from intercode.envs import (
 from experiments.policies import (
     HumanPolicy, ChatGPTPolicy, ChatAnthropicPolicy
 )
+from experiments.logger_helper import Logger
 from experiments.utils import HANDICAP_MAP, PROMPT_MAP, SETTING_MAP, LANG_BY_ENV
 
 from typing import Dict, List
@@ -43,16 +45,20 @@ def main(args):
     if env == "swe" and args.use_toy_example:
         print("Use toy example")
         ENV_MAP["swe"]["data_path"] = "./data/swe-bench/ic_toy_examples.json"
+
+    os.makedirs(args.log_dir, exist_ok=True)
+    logger = Logger(filename=os.path.join(args.log_dir, "demo"))
+
     image_name = ENV_MAP[env]["image_name"]
     data_path = ENV_MAP[env]["data_path"] if "data_path" in ENV_MAP[env] else None
     preprocess = ENV_MAP[env]["preprocess"] if "preprocess" in ENV_MAP[env] else None
 
-    env = ENV_MAP[env]["env"](image_name, data_path=data_path, verbose=True, preprocess=preprocess, traj_dir="./traj_dir/")
+    env = ENV_MAP[env]["env"](image_name, data_path=data_path, verbose=True, preprocess=preprocess, traj_dir="./traj_dir/", logger=logger)
     human_policy = HumanPolicy() if "human" in args.mode else None
     ai_policy = None
     if "ai" in args.mode:
         policy_args = dict(language=LANG_BY_ENV[args.env], setting=SETTING_MAP[args.env],
-                template=args.template, dialogue_limit=args.dialogue_limit, model=args.model, verbose=True)
+                template=args.template, dialogue_limit=args.dialogue_limit, model=args.model)
 
         if args.model.lower() == "claude":
             ai_policy = ChatAnthropicPolicy(**policy_args)
@@ -66,32 +72,31 @@ def main(args):
                 ai_policy.reset()
             obs, reward, done = None, None, False
             query = env.query if hasattr(env, "query") else None
-            print(f'------\nQuery {idx}: {env.query}')
+            logger.info(f'------\nQuery {idx}: {env.query}')
             turn = 0
             while not done:
-                print(f"- Turn {turn}")
+                logger.info(f"- Turn {turn}")
                 turn += 1
                 if args.mode == "human":
-                    action = human_policy.forward(query, obs, env.get_available_actions())
+                    action = human_policy.forward(query, obs)
                 elif args.mode == "ai":
-                    action, _ = ai_policy.forward(query, obs, reward, env.get_available_actions())
+                    action, _ = ai_policy.forward(query, obs, reward)
                 elif args.mode == "human_ai":
-                    ai_action, _ = ai_policy.forward(query, obs, reward, env.get_available_actions())
-                    print(f"-- AI Action: {ai_action}")
-                    action = human_policy.forward(query, ai_action, env.get_available_actions())
+                    ai_action, _ = ai_policy.forward(query, obs, reward)
+                    logger.info(f"-- AI Action: {ai_action}")
+                    action = human_policy.forward(query, ai_action)
                     if action == "":
                         action = ai_action
                 else:
                     raise ValueError(f"mode {args.mode!r} is not supported")
-
-                print(f"-- Action: {action}")
-                obs, reward, done, info = env.step(action)
+                observation, reward, done, info = env.step(action)
+                logger.msg_turn(turn, observation, action, reward, done, info)
                 if reward == 1:
-                    print("Solved!")
+                    logger.info("Solved!")
                     done = True
 
     except KeyboardInterrupt:
-        print("Exiting InterCode environment...")
+        logger.info("Exiting InterCode environment...")
     finally:
         env.close()
 
@@ -105,6 +110,7 @@ if __name__ == '__main__':
     parser.add_argument('--dialogue_limit', type=int, help='maximum number of turns in the policy\'s dialogue to keep, only used when the mode is "ai"', default=999)
     parser.add_argument('--max_turns', type=int, help='max number of interaction turns, only used when the mode is "ai"', default=999)
     parser.add_argument('--template', type=str, help="template to use for prompting strategy", default="v2")
+    parser.add_argument('--log_dir', type=str, help="directory to save log", default="./logs/demo/")
 
     args = parser.parse_args()
     main(args)

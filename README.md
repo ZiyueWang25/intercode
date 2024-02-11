@@ -1,3 +1,10 @@
+# SWE-Agent-Bench
+
+1. Setup the Docker container: `./setup.sh`
+2. Run demo: `python run_demo.py swe --mode=human_ai --model=gpt-3.5-turbo --template=swe --use_toy_example`
+3. TODO: run multi-turn with proper logging.
+
+# ####################################################
 # 🔄 InterCode
 Build interactive code environments for interactive code agents.
 

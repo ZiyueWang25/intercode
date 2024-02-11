@@ -5,22 +5,27 @@ import re
 from docker.models.containers import Container
 
 from intercode.envs.swe import constants
+from intercode.envs.swe import util
 
 
 class Installer:
-    def __init__(self, logger, container:Container):
+    def __init__(self, logger, container: Container):
         self.path_conda = os.path.abspath("/miniconda3")
         self.conda_bin_path = os.path.join(self.path_conda, "bin")
         self.path_activate = os.path.join(self.conda_bin_path, "activate")
         self.conda_exec_cmd = os.path.join(self.conda_bin_path, "conda")
+        self.testbed = "./testbed/"
+        os.makedirs(self.testbed, exist_ok=True)
         self.logger = logger
         self.container = container
 
         self.env_list = self.get_conda_env_names()
-    
+
     def get_conda_env_names(self) -> list:
         # Get list of conda environments
-        code, output = self.container.exec_run(self.clean_cmd(f"{self.conda_exec_cmd} env list"))
+        code, output = self.container.exec_run(
+            self.clean_cmd(f"{self.conda_exec_cmd} env list")
+        )
         output = output.decode()
         if code != 0:
             raise ValueError(f"failed to get conda env list: {output}")
@@ -36,7 +41,7 @@ class Installer:
             if len(parts) == 2:
                 env_name = parts[0]
             elif len(parts) == 1:
-                env_name = parts[0].split('/')[-1]
+                env_name = parts[0].split("/")[-1]
             env_names.append(env_name)
         return env_names
 
@@ -44,11 +49,15 @@ class Installer:
         """Cleans action string"""
         entrypoint = "/bin/bash"
         if '"' in action:
-            self.logger.warning(f'" in action: {action}. You should update it to use \' ')
-        return f"{entrypoint} -c \"{action.strip()}\""
+            self.logger.warning(
+                f"\" in action: {action}. You should update it to use ' "
+            )
+        return f'{entrypoint} -c "{action.strip()}"'
 
     def activate_conda(self, env_name):
-        code, output = self.container.exec_run(self.clean_cmd(f". {self.path_activate} {env_name}"))
+        code, output = self.container.exec_run(
+            self.clean_cmd(f". {self.path_activate} {env_name}")
+        )
         if code != 0:
             raise ValueError(f"failed to activate: {output.decode()}")
         self.container.exec_run(self.clean_cmd(f"conda deactivate"))
@@ -57,7 +66,6 @@ class Installer:
         self.container.exec_run(self.clean_cmd(f"conda activate {env_name}"))
         if code != 0:
             raise ValueError(f"failed to activate env: {output.decode()}")
-
 
     def install_pkg(self, instance):
         repo = instance["repo"]
@@ -78,23 +86,25 @@ class Installer:
         pkgs = install["packages"] if "packages" in install else ""
         if pkgs == "requirements.txt":
             # Create environment
-            code, output = self.container.exec_run(self.clean_cmd(f"{self.conda_exec_cmd} create -n {env_name} python={install['python']} -y"))
+            code, output = self.container.exec_run(
+                self.clean_cmd(
+                    f"{self.conda_exec_cmd} create -n {env_name} python={install['python']} -y"
+                )
+            )
             if code != 0:
                 raise ValueError(f"failed to install conda: {output.decode()}")
             self.activate_conda(env_name)
 
-
             # Install dependencies
-            path_to_reqs = get_requirements(instance, self.testbed)
+            path_to_reqs = get_requirements(instance, self.testbed, self.container)
             cmd = f"pip install -r {path_to_reqs}"
             code, output = self.container.exec_run(self.clean_cmd(cmd))
             if code != 0:
                 raise ValueError(f"failed to install requirements: {output.decode()}")
-            os.remove(path_to_reqs)
         elif pkgs == "environment.yml":
             # Create environment from yml
             path_to_reqs = get_environment_yml(
-                instance, env_name, self.testbed
+                instance, env_name, self.testbed, self.container
             )
             if "no_use_env" in install and install["no_use_env"]:
                 # `conda create` based installation
@@ -104,7 +114,7 @@ class Installer:
                 )
                 code, output = self.container.exec_run(self.clean_cmd(cmd))
                 if code != 0:
-                    raise ValueError(f"failed to create environment: {output.decode()}")                    
+                    raise ValueError(f"failed to create environment: {output.decode()}")
 
                 # Install dependencies
                 cmd = f"{self.conda_exec_cmd} env update -f {path_to_reqs}"
@@ -113,7 +123,9 @@ class Installer:
                 )
                 code, output = self.container.exec_run(self.clean_cmd(cmd))
                 if code != 0:
-                    raise ValueError(f"failed to install dependencies: {output.decode()}")
+                    raise ValueError(
+                        f"failed to install dependencies: {output.decode()}"
+                    )
             else:
                 # `conda env create` based installation
                 cmd = f"{self.conda_exec_cmd} env create --file {path_to_reqs}"
@@ -146,20 +158,25 @@ class Installer:
             if code != 0:
                 raise ValueError(f"failed to install pip packages: {output.decode()}")
 
-def get_requirements(instance: dict, save_path: str = None):
+
+def get_requirements(instance: dict, save_path: str, container: Container):
     """
     Get requirements.txt for given task instance
 
     Args:
         instance (dict): task instance
-        save_path (str): If provided, save requirements.txt to this path
+        save_path (str): save requirements.txt to this path
     Returns:
         requirements.txt (str): If save_path given, returns path to saved requirements.txt.
             Otherwise, returns requirements.txt as string
     """
     # Attempt to find requirements.txt at each path based on task instance's repo
     path_worked = False
-    commit = 'environment_setup_commit' if 'environment_setup_commit' in instance else 'base_commit'
+    commit = (
+        "environment_setup_commit"
+        if "environment_setup_commit" in instance
+        else "base_commit"
+    )
 
     for req_path in constants.MAP_REPO_TO_REQS_PATHS[instance["repo"]]:
         reqs_url = os.path.join(
@@ -213,9 +230,14 @@ def get_requirements(instance: dict, save_path: str = None):
     path_to_reqs = os.path.join(save_path, "requirements.txt")
     with open(path_to_reqs, "w") as f:
         f.write(all_reqs)
-    return path_to_reqs
+    util.copy_to_container(container, path_to_reqs, "/")
+    os.remove(path_to_reqs)
+    return "/requirements.txt"
 
-def get_environment_yml(instance: dict, env_name: str, save_path: str = None) -> str:
+
+def get_environment_yml(
+    instance: dict, env_name: str, save_path, container: Container
+) -> str:
     """
     Get environment.yml for given task instance
 
@@ -230,7 +252,11 @@ def get_environment_yml(instance: dict, env_name: str, save_path: str = None) ->
     # Attempt to find environment.yml at each path based on task instance's repo
     path_worked = False
 
-    commit = 'environment_setup_commit' if 'environment_setup_commit' in instance else 'base_commit'
+    commit = (
+        "environment_setup_commit"
+        if "environment_setup_commit" in instance
+        else "base_commit"
+    )
     for req_path in constants.MAP_REPO_TO_ENV_YML_PATHS[instance["repo"]]:
         reqs_url = os.path.join(
             constants.SWE_BENCH_URL_RAW, instance["repo"], instance[commit], req_path
@@ -262,5 +288,6 @@ def get_environment_yml(instance: dict, env_name: str, save_path: str = None) ->
     path_to_reqs = os.path.join(save_path, "environment.yml")
     with open(path_to_reqs, "w") as f:
         f.write("\n".join(cleaned))
-    return path_to_reqs
-
+    util.copy_to_container(container, path_to_reqs, "/")
+    os.remove(path_to_reqs)
+    return "/environment.yml"

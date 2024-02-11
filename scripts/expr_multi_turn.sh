@@ -1,4 +1,6 @@
 # !bin/bash
+set -x
+set -e
 
 # Data Paths
 # - (SQL)  ./data/sql/spider/ic_spider_dev.json
@@ -19,17 +21,17 @@
 # - chat
 
 # Bash Call
-python -m experiments.eval_n_turn \
-    --data_path ./data/nl2bash/nl2bash_fs_1.json \
-    --dialogue_limit 7 \
-    --env bash \
-    --image_name intercode-nl2bash \
-    --log_dir logs/experiments \
-    --max_turns 10 \
-    --policy chat \
-    --template v2 \
-    --model gpt-3.5-turbo \
-    --verbose
+# python -m experiments.eval_n_turn \
+#     --data_path ./data/nl2bash/nl2bash_fs_1.json \
+#     --dialogue_limit 7 \
+#     --env bash \
+#     --image_name intercode-nl2bash \
+#     --log_dir logs/experiments \
+#     --max_turns 10 \
+#     --policy_type chat \
+#     --template v2 \
+#     --model gpt-3.5-turbo \
+#     --verbose
 
 # SQL Call
 # python -m experiments.eval_n_turn \
@@ -39,7 +41,7 @@ python -m experiments.eval_n_turn \
 #     --image_name docker-env-sql \
 #     --log_dir logs/experiments \
 #     --max_turns 10 \
-#     --policy chat \
+#     --policy_type chat \
 #     --template game_sql \
 #     --model gpt-3.5-turbo
 #     --handicap 
@@ -53,7 +55,7 @@ python -m experiments.eval_n_turn \
 #     --image_name intercode-python \
 #     --log_dir logs/experiments \
 #     --max_turns 10 \
-#     --policy chat \
+#     --policy_type chat \
 #     --template function \
 #     --model gpt-3.5-turbo \
 #     --verbose
@@ -66,7 +68,21 @@ python -m experiments.eval_n_turn \
 #     --image_name intercode-ctf \
 #     --log_dir logs/experiments \
 #     --max_turns 10 \
-#     --policy chat \
+#     --policy_type chat \
 #     --template ctf \
 #     --model gpt-4 \
 #     --verbose
+
+# SWE Call
+python -m experiments.eval_n_turn \
+    --data_path ./data/swe-bench/ic_swe_bench_dev.json \
+    --dialogue_limit 40 \
+    --env swe \
+    --image_name intercode-swe \
+    --log_dir logs/experiments \
+    --max_turns 20 \
+    --policy_type chat \
+    --template swe \
+    --model claude \
+    --num_tasks 20 \
+    --verbose
