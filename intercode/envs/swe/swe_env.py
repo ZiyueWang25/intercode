@@ -72,47 +72,43 @@ class SWEEnv(BashEnv):
         """
         if not any(x in action for x in SPECIAL_COMMANDS):
             self.observation = f"Your action doesn't contain {SPECIAL_COMMANDS}"
+            self.info[ACTION_EXEC] = False
 
         if sum(x in action for x in SPECIAL_COMMANDS) > 1:
             self.observation = f"Your action contain more than 1 special command. Only one of {SPECIAL_COMMANDS} is allowed per action."
+            self.info[ACTION_EXEC] = False
             return self.observation, 0, False, self.info
 
         if "COMMAND" in action:
             if "nano " in action:
                 self.observation = "You cannot manually edit the file. You are only allowed to use PATCH with the desired diff."
+                self.info[ACTION_EXEC] = False
                 return self.observation, 0, False, self.info
             if "rm " in action:
                 self.observation = "You cannot remove any file. You are only allowed to use PATCH with the desired diff."
+                self.info[ACTION_EXEC] = False
                 return self.observation, 0, False, self.info
             self.exec_action(self.extract_command(action))
 
         if "PATCH" in action:
             patch = self.extract_patch(action)
+            self.info[ACTION_EXEC] = False
             self.info["patch"] = patch
             file = patch.split("---")[1].split("+++")[0].split("/")[-1].strip()
             if "test_" in file or "_test.py" in file:
                 self.observation = "You cannot edit test file."
                 return self.observation, 0, False, self.info
 
-            exit_code, output = self.apply_patch(patch, rm=False)
-            self.observation = output.decode("utf-8")
-            self.info[ACTION_EXEC] = exit_code == 0
+            self.apply_patch(patch, rm=False)
 
         if "SUBMIT" in action:
             self.exec_action("pytest")
-            reward, info = self.get_reward()
-            if self.traj_dir is not None:
-                self.save_trajectory()
-            return self.observation, reward, True, info
+            reward = self.get_reward()
+            return self.observation, reward, True, self.info
 
         if "SKIP" in action:
-            self.trajectory.append((action, ""))
-            return "SKIP", 0, True, self.info 
+            return super().step("skip")
         
-            
-        self.logger.info(f"Action: {action}")
-        self.logger.info(f"Observation: {self.observation}")
-        self.trajectory.append((action, self.observation))
         return self.observation, 0, False, self.info
 
     def apply_patch(self, patch: str, rm=True):
@@ -121,23 +117,11 @@ class SWEEnv(BashEnv):
         with open(patch_path, "w") as f:
             f.write(patch)
         util.copy_to_container(self.container, patch_path, self.workdir)
-        exit_code, output = self.container.exec_run(
-            self.clean_cmd(f"cat {orig_patch_path}"),
-            workdir=self.workdir
-        )
-        if exit_code != 0:
-            raise ValueError(f"patch.diff doesn't exist: {output.decode()}")
 
         # Apply patch to testbed directory
-        exec_result = self.container.exec_run(
-            self.clean_cmd(f"git apply -v {orig_patch_path}"),
-            workdir=self.workdir
-        )
-        if exec_result.exit_code != 0:
-            raise ValueError(f"failed to apply patch: {exec_result}")
-        self.logger.info("Successfully applied patch")
-        os.remove(patch_path)
+        self.exec_action(f"git apply -v {orig_patch_path}")
         if rm:
+            os.remove(patch_path)
             self.container.exec_run(
                 self.clean_cmd(f"rm {orig_patch_path}"),
                 workdir=self.workdir
@@ -156,10 +140,7 @@ class SWEEnv(BashEnv):
         return patch
 
     def get_reward(self) -> Tuple[float, Dict]:
-        reward, info = 1, {}
-        if "failed" in self.observation:
-            reward = 0
-        return reward, info
+        return int("failed" not in self.observation)
     
     def close(self):
         self.logger.info("Beginning environment shutdown...")

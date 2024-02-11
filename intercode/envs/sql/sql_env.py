@@ -19,6 +19,10 @@ SQL_CONFIG = {
     'password': 'admin',
 }
 
+def preprocess_sql(record: Dict) -> List:
+    db = record["db"]
+    return [f"use {db}"]
+
 class SqlEnv(IntercodeEnv):
     """Gym environment for SQL"""
     name = "ic_sql"

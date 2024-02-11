@@ -4,18 +4,30 @@ from typing import Tuple
 
 from .utils import ACTION_PARSER_MAP, PROMPT_MAP, CompletionGPT, ChatGPT, ChatAnthropic, PalmChat, PalmCompletion, HFChat
 
+def initialize_policy(policy_type, model, **kwargs) -> 'BasePolicy':
+    if model == "claude":
+        policy = ChatAnthropicPolicy(model=model, **kwargs)
+    elif policy_type == 'chat':
+        policy = ChatGPTPolicy(model=model, **kwargs)
+    elif policy_type == 'complete':
+        policy = CompletionGPTPolicy(model=model, **kwargs)
+    else:
+        raise ValueError(f'Policy {policy_type!r} not recognized')
+    return policy
+    
+
 class BasePolicy:
     def __init__(self):
         pass
 
-    def forward(query, observation, available_actions):
+    def forward(query, observation):
         raise NotImplementedError
     
 class HumanPolicy(BasePolicy):
     def __init__(self):
         super().__init__()
     
-    def forward(self, query, observation, available_actions):
+    def forward(self, query, observation):
         action = input('Human Action > ')
         return action
     
@@ -38,7 +50,7 @@ class CompletionGPTPolicy(BasePolicy):
     def add_to_dialogue(self, handicap: str):
         self.handicap = handicap
 
-    def forward(self, query, observation, reward, available_actions) -> Tuple[str, bool]:
+    def forward(self, query, observation, reward) -> Tuple[str, bool]:
         if self.prompt is None:
             # First Turn
             prompt = self.prompt = self.template.get_init_msg() + self.handicap + self.template.get_query_msg(query)
@@ -84,7 +96,7 @@ class ChatGPTPolicy(BasePolicy):
     def add_to_dialogue(self, handicap: str):
         self.dialogue.append({"role": "system", "content": handicap})
 
-    def forward(self, query, observation, reward, available_actions) -> Tuple[str, bool]:
+    def forward(self, query, observation, reward) -> Tuple[str, bool]:
         # Append response to dialogue
         if self.dialogue[-1]["role"] == "system":
             # First Turn
@@ -131,7 +143,7 @@ class ChatAnthropicPolicy(BasePolicy):
         if self.verbose:
             print(f"System Message:\n {self.template.get_init_msg()}")
 
-    def forward(self, query, observation, reward, available_actions) -> Tuple[str, bool]:
+    def forward(self, query, observation, reward) -> Tuple[str, bool]:
         # Append response to dialogue
         if not self.dialogue:
             # First Turn
@@ -146,7 +158,7 @@ class ChatAnthropicPolicy(BasePolicy):
             self.dialogue.append({"role": "user", "content": self.template.get_obs_msg(observation, reward)})
             # Only keep {self.dialogue_limit} most recent messages
             if self.dialogue_limit and len(self.dialogue) - 2 > self.dialogue_limit:
-                self.dialogue = self.dialogue[:2] + self.dialogue[-self.dialogue_limit:]
+                self.dialogue = self.dialogue[:1] + self.dialogue[-self.dialogue_limit:]
 
         # Retrieve Action from ChatGPT
         if self.verbose:
@@ -177,7 +189,7 @@ class PalmChatPolicy(BasePolicy):
     def add_to_dialogue(self, handicap: str):
         self.handicap = handicap
 
-    def forward(self, query, observation, reward, available_actions) -> Tuple[str, bool]:
+    def forward(self, query, observation, reward) -> Tuple[str, bool]:
         if len(self.dialogue) == 0:
             # First Turn
             self.dialogue = [{"author": "0", "content": self.template.get_init_msg() + self.handicap + self.template.get_query_msg(query)}]
@@ -215,7 +227,7 @@ class PalmCompletionPolicy(BasePolicy):
     def add_to_dialogue(self, handicap: str):
         self.handicap = handicap
 
-    def forward(self, query, observation, reward, available_actions) -> Tuple[str, bool]:
+    def forward(self, query, observation, reward) -> Tuple[str, bool]:
         if self.prompt is None:
             # First Turn
             prompt = self.prompt = self.template.get_init_msg() + self.handicap + self.template.get_query_msg(query)
@@ -256,7 +268,7 @@ class HFChatPolicy(BasePolicy):
     def add_to_dialogue(self, handicap: str):
         self.dialogue.append({"role": "system", "content": handicap})
 
-    def forward(self, query, observation, reward, available_actions) -> Tuple[str, bool]:
+    def forward(self, query, observation, reward) -> Tuple[str, bool]:
         # Append response to dialogue
         if len(self.dialogue) == 0:
             # First Turn

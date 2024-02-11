@@ -1,7 +1,14 @@
 from intercode.envs import (
     BashEnv, IntercodeEnv, AGENT_OBS, REWARD
 )
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
+
+
+def preprocess_ctf(record: Dict) -> List:
+    cmds = [f"cd /ctf/{record['task_id']}"]
+    if "setup" in record:
+        cmds.append(record["setup"])
+    return cmds
 
 class CTFEnv(BashEnv):
     """Gym environment for CTF game"""

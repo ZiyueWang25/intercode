@@ -1,83 +1,50 @@
-import argparse, json, os, re
-from intercode.envs import (
-    BashEnv, CTFEnv, PythonEnv, SqlEnv, SWEEnv, ACTION_EXEC, AGENT_OBS
-)
+import logging
+import argparse, os
 from tqdm import tqdm
-from typing import Dict, List
-from experiments.policies import (
-    CompletionGPTPolicy, ChatGPTPolicy, PalmChatPolicy, PalmCompletionPolicy
-)
+
+from intercode.envs import ACTION_EXEC, initialize_env
+from experiments.policies import initialize_policy
+from experiments.logger_helper import Logger
 from experiments.utils import HANDICAP_MAP, PROMPT_MAP, SETTING_MAP
-from rich import print
 
 parser = argparse.ArgumentParser(description='N-turn evaluation for Intercode environment')
 parser.add_argument('--data_path', type=str, help='path to dataset to evaluate on', required=True)
 parser.add_argument('--dialogue_limit', type=int, help='maximum number of turns in the policy\'s dialogue to keep', required=True)
-parser.add_argument('--env', choices=['sql', 'bash', 'python', 'ctf'], help='Intercode environment to run eval on', required=True)
+parser.add_argument('--env', choices=['sql', 'bash', 'python', 'ctf', 'swe'], help='Intercode environment to run eval on', required=True)
 parser.add_argument('--handicap', action='store_true', help='enable handicap')
 parser.add_argument('--image_name', type=str, help='name of docker image to build environment with', required=True)
 parser.add_argument('--log_dir', type=str, help='folder to save experiment run log file to', required=True)
 parser.add_argument('--max_turns', type=int, help='max number of interaction turns', required=True)
-parser.add_argument('--policy', choices=['chat', 'complete'], help="policy to use for evaluation", required=True)
+parser.add_argument('--policy_type', choices=['chat', 'complete'], help="policy type to use for evaluation", required=True)
 parser.add_argument('--template', type=str, help="template to use for prompting strategy", required=True)
 parser.add_argument('--verbose', action='store_true', help="print out logs")
 parser.add_argument('--model', type=str, help="model to use for policy", required=True)
+parser.add_argument('--num_tasks', type=int, help="# of tasks to test, if -1, then test all tasks", default=20)
 args = parser.parse_args()
 
-
-def preprocess_ctf(record: Dict) -> List:
-    cmds = [f"cd /ctf/{record['task_id']}"]
-    if "setup" in record:
-        cmds.append(record["setup"])
-    return cmds
-
-def preprocess_sql(record: Dict) -> List:
-    db = record["db"]
-    return [f"use {db}"]
 
 class ExperimentWrapper():
     def __init__(self, args):
         self.args = args
 
-        # Set environment (No logging for env)
-        self.env = None
-        if args.env == 'sql':
-            self.env = SqlEnv(image_name=args.image_name,
-                data_path=args.data_path, preprocess=preprocess_sql)
-        elif args.env == 'bash':
-            self.env = BashEnv(image_name=args.image_name,
-                data_path=args.data_path)
-        elif args.env == 'python':
-            self.env = PythonEnv(image_name=args.image_name,
-                data_path=args.data_path, is_agent=True)
-        elif args.env == 'ctf':
-            self.env = CTFEnv(image_name=args.image_name,
-                data_path=args.data_path, preprocess=preprocess_ctf)
-        elif args.env == 'swe':
-            self.env = SWEEnv(image_name=args.image_name,
-                              data_path=args.data_path)
-        else:
-            raise ValueError(f'Environment {args.env} not recognized')
-        
         # Define log file name and path
         if not os.path.exists(args.log_dir):
             os.makedirs(args.log_dir, exist_ok=True)
-        log_file_name = f"{self.env.name}_multiturn_{args.model}_{args.max_turns}_turns.json"
-        self.log_path = os.path.join(args.log_dir, log_file_name)
-        self.log_data = {}
+        log_file_name = f"{args.env}_multiturn_{args.model}_{args.max_turns}_turns"
+        log_path = os.path.join(args.log_dir, log_file_name)
+        self.logger = Logger(log_path, file_level=logging.INFO, stdout_level=logging.DEBUG)
+        if not args.verbose:
+            self.logger.disabled = True
+
+        # Set environment (No logging for env)
+        self.env = initialize_env(args.env, image_name=args.image_name, data_path=args.data_path, logger=self.logger, verbose=args.verbose)
+        
 
         # Initialize Policy
         if args.template not in PROMPT_MAP:
             raise ValueError(f"Prompt {args.template} not recognized; Options: {PROMPT_MAP.keys()}")
-        self.policy = None
-        if args.policy == 'chat':
-            self.policy = ChatGPTPolicy(language=args.env, setting=SETTING_MAP[args.env],
-                template=args.template, dialogue_limit=args.dialogue_limit, model=args.model)
-        elif args.policy == 'complete':
-            self.policy = CompletionGPTPolicy(language=args.env, setting=SETTING_MAP[args.env],
-                template=args.template, dialogue_limit=args.dialogue_limit, model=args.model)
-        else:
-            raise ValueError(f'Policy {args.policy} not recognized')
+        self.policy = initialize_policy(args.policy_type, args.model, language=args.env, setting=SETTING_MAP[args.env],
+                template=args.template, dialogue_limit=args.dialogue_limit)
         
         # Initialize handicap
         self.handicap = None
@@ -85,123 +52,53 @@ class ExperimentWrapper():
             self.handicap = HANDICAP_MAP[args.env]
     
     def run_expr(self):
+        self.logger.debug("Start experiments")
         try:
-            for idx in tqdm(range(0,len(self.env.data_loader)), disable=self.args.verbose):
+            for idx in tqdm(range(0, len(self.env.data_loader)), disable=self.args.verbose):
                 # Reset variables per task
                 self.env.reset(idx)
                 self.policy.reset()
-                observation, reward, is_valid_action = None, None, None
-                turn_history = {"actions": [], "observations": [], "rewards": [], "is_valid_action": []}
                 record = self.env.data_loader.get(idx)
+                self.logger.msg_record(record)
+                self.logger.log_episode(self.env, record, idx)
 
                 # Add Handicap
                 if self.handicap is not None:
                     self.policy.add_to_dialogue(self.handicap(record))
 
-                if self.args.verbose:
-                    print(f'------\nQuery {idx}: {self.env.query}')
+                self.logger.info("#" * 20 + f' Query {idx} ' + "#" * 20)
+                self.logger.info(f'{self.env.query}')
+                observation, reward = None, None
                 for turn in range(self.args.max_turns):
-                    # Invoke Action -> Observation Iteration
                     try:
-                        action, is_code = self.policy.forward(
-                            self.env.query,
-                            observation,
-                            reward,
-                            self.env.get_available_actions())
+                        action, _ = self.policy.forward(self.env.query, observation,reward)
                     except (ValueError, TypeError) as e:
-                        print(f"[ERROR] Index {idx}: {e}")
-                        # Logging
-                        turn_history["actions"].append("blocked: {e}")
-                        turn_history["rewards"].append(0)
+                        self.logger.error(f"Index {idx}: {e}")
+                        self.logger.log_turn_history(action=f"blocked: {e}", reward=0)
                         break
 
-                    if not is_code:
-                        reward = 0
-                        observation = self.policy.template.get_retry_msg()
-                        is_valid_action = False
-
+                    observation, reward, done, info = self.env.step(action)
+                    self.logger.info("#" * 20 + f" Turn {turn} " + "#" * 20)
+                    self.logger.info(f"-- ACTION:\n{action}")
+                    if len(observation) > 200:
+                        self.logger.info(f"-- OBSERVATION:\n{observation[:200]} ...")
                     else:
-                        if isinstance(self.env, PythonEnv):
-                            if action.startswith("def"):
-                                func_name = re.match(r'def (\w+)\(', action).group(1)
-                                observation, reward, _, info = self.env.step(action)
-                                _, reward, _, info = self.env.step("submit " + func_name)
+                        self.logger.info(f"-- OBSERVATION:\n{observation}")
 
-                                SHOW_FAILED_CASE = 0
-                                if reward != 1:
-                                    if SHOW_FAILED_CASE == 1:
-                                        for k, v in info[AGENT_OBS].items():
-                                            if len(v['error']) > 0:
-                                                observation = f"Failed Test Case: {k}\nPlease try again."
-                                                break
-                                    elif SHOW_FAILED_CASE == 2:
-                                        fails = 0
-                                        for k, v in info[AGENT_OBS].items():
-                                            if len(v['error']) > 0:
-                                                fails += 1
-                                        observation = f"Failed {fails}/{len(info[AGENT_OBS])} Test Cases. Please try again."
-                                    else:
-                                        if any([len(v['error']) > 0 for k, v in info[AGENT_OBS].items()]):
-                                            observation = "Test case did not pass. Please try again."
-                            else:
-                                observation, reward, _, info = self.env.step(action)
-                        else:
-                            if action != "skip":
-                                observation, reward, done, info = self.env.step(action)
-                                is_valid_action = info[ACTION_EXEC]
-                            else:
-                                observation, reward, done, info = "skipped", 0, True, {}
-                                is_valid_action = True
-                            if not isinstance(self.env, CTFEnv):
-                                _, reward, done, info = self.env.step("submit")
-                            else:
-                                if done and reward != 1 and action.lower() != "skip":
-                                    observation = "Submitted flag is incorrect. Keep trying!"
-                    
-                    if self.args.verbose:
-                        print(f"- Turn {turn}")
-                        print(f"-- Action: {action}")
-                        if isinstance(observation, str) and observation.startswith(f'No {self.policy.language} code'):
-                            print(f"-- Observation: (meta) No code output, policy's template's retry message was invoked")
-                        else:
-                            print(f"-- Observation: {observation}")
+                    self.logger.info(f"-- REWARD:\n{reward}")
+                    self.logger.info(f"-- DONE:\n{done}")
+                    self.logger.info(f"-- INFO:\n{info}")
+                    self.logger.log_turn_history(idx, str(observation), action, reward, info[ACTION_EXEC])
 
-                    # Logging
-                    turn_history["actions"].append(action)
-                    turn_history["observations"].append(str(observation)) # To avoid serialization issues
-                    turn_history["rewards"].append(reward)
-                    turn_history["is_valid_action"].append(is_valid_action)
-
-                    # End episode upon perfect reward
-                    if reward == 1 or action.lower() == "skip":
+                    if done:
                         break
                 
-                max_reward = max(turn_history["rewards"])
-                log_episode = {
-                    "environment": self.env.name,
-                    "dataset": self.args.data_path,
-                    "task_id": idx,
-                    "query": self.env.query,
-                    "turn_history": turn_history,
-                    "summary": {
-                        "max_reward": max_reward,
-                        "max_reward_idx": turn_history["rewards"].index(max_reward),
-                        "turns_taken": turn + 1,
-                        "turns_max": self.args.max_turns,
-                    }
-                }
-                if "hardness" in record:
-                    log_episode["hardness"] = record["hardness"]
-                self.log_data[idx] = log_episode
-
-                if self.args.verbose:
-                    print(f"Query {idx} Finished\n-Reward: {max_reward}\n-Turns: {turn+1}")
-
+                self.logger.info(f"Query {idx} Finished")
         except KeyboardInterrupt:
             print("Keyboard interrupt detected")
         finally:
-            with open(self.log_path, "w") as fp:
-                json.dump(self.log_data, fp, indent=2)
+            self.logger.log_summary(idx)
+            self.logger.save_turn()
             self.env.close()
 
 

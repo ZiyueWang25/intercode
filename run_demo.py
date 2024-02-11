@@ -72,13 +72,13 @@ def main(args):
                 print(f"- Turn {turn}")
                 turn += 1
                 if args.mode == "human":
-                    action = human_policy.forward(query, obs, env.get_available_actions())
+                    action = human_policy.forward(query, obs)
                 elif args.mode == "ai":
-                    action, _ = ai_policy.forward(query, obs, reward, env.get_available_actions())
+                    action, _ = ai_policy.forward(query, obs, reward)
                 elif args.mode == "human_ai":
-                    ai_action, _ = ai_policy.forward(query, obs, reward, env.get_available_actions())
+                    ai_action, _ = ai_policy.forward(query, obs, reward)
                     print(f"-- AI Action: {ai_action}")
-                    action = human_policy.forward(query, ai_action, env.get_available_actions())
+                    action = human_policy.forward(query, ai_action)
                     if action == "":
                         action = ai_action
                 else:

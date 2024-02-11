@@ -3,10 +3,11 @@ import numpy as np
 import datetime, json, logging, os, re
 
 from abc import ABC, abstractmethod
-from rich.logging import RichHandler
 from typing import Dict, List, Tuple
 
 from intercode.utils import IntercodeDataLoader, get_container
+from experiments.logger_helper import Logger
+
 
 # Constants
 AGENT_OBS = "agent_obs"
@@ -15,12 +16,6 @@ CORRUPT_GOLD = "corrupt_gold"
 ACTION_EXEC = "action_executed"
 REWARD = "reward"
 
-# Set up logger
-handler = RichHandler(show_time=False)
-handler.setLevel(logging.DEBUG)
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.addHandler(handler)
 # TODO: save logger results to a central place for future reference
 
 class IntercodeEnv(ABC, gym.Env):
@@ -41,7 +36,10 @@ class IntercodeEnv(ABC, gym.Env):
         """
         super(IntercodeEnv, self).__init__()
         self.kwargs = kwargs
-        self.logger = logger
+        if "logger" in kwargs and kwargs["logger"] is not None:
+            self.logger = kwargs["logger"]
+        else: 
+            self.logger = Logger()
 
         if "verbose" not in self.kwargs or self.kwargs["verbose"] != True:
             self.logger.disabled = True
@@ -96,7 +94,7 @@ class IntercodeEnv(ABC, gym.Env):
             info (`dict`) - additional information (e.g. debugging information)
         """
         if action == "skip":
-            return "skipped", 0, True, {}
+            return "skipped", 0, True, {ACTION_EXEC: True}
         if action.startswith("submit"):
             self.trajectory.append((action, None))
             reward, info = 0, {}

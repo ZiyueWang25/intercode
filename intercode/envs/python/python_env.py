@@ -24,6 +24,29 @@ class PythonEnv(IntercodeEnv):
     
     def reset_container(self) -> None:
         self.conn.root.execute(RESET_KEYWORD)
+
+    def step(self, action: str) -> Tuple[str, int, bool, Dict]:
+        observation, reward, done, info = super(self).step(action)
+        if action.startswith("def"):
+            func_name = re.match(r'def (\w+)\(', action).group(1)
+            _, reward, _, info = super(self).step("submit " + func_name)
+            SHOW_FAILED_CASE = 0
+            if reward != 1:
+                if SHOW_FAILED_CASE == 1:
+                    for k, v in info[AGENT_OBS].items():
+                        if len(v['error']) > 0:
+                            observation = f"Failed Test Case: {k}\nPlease try again."
+                            done=True
+                elif SHOW_FAILED_CASE == 2:
+                    fails = 0
+                    for k, v in info[AGENT_OBS].items():
+                        if len(v['error']) > 0:
+                            fails += 1
+                    observation = f"Failed {fails}/{len(info[AGENT_OBS])} Test Cases. Please try again."
+                else:
+                    if any([len(v['error']) > 0 for k, v in info[AGENT_OBS].items()]):
+                        observation = "Test case did not pass. Please try again."
+        return observation, reward, done, info
     
     def exec_action(self, action: str) -> None:
         try:
