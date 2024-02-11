@@ -17,6 +17,7 @@ RUN bash miniconda.sh -b -u -p ./miniconda3
 RUN rm miniconda.sh
 # support python=3.6 download
 RUN /miniconda3/bin/conda config --add channels conda-forge
+RUN /miniconda3/bin/conda init
 RUN export PATH=/miniconda3/bin:$PATH
 
 # for Github: https://stackoverflow.com/a/67390274
