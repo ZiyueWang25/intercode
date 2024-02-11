@@ -100,7 +100,11 @@ class SWEEnv(BashEnv):
             patch = self.extract_patch(action)
             self.info[ACTION_EXEC] = False
             self.info["patch"] = patch
-            file = patch.split("---")[1].split("+++")[0].split("/")[-1].strip()
+            try:
+                file = patch.split("---")[1].split("+++")[0].split("/")[-1].strip()
+            except IndexError:
+                self.observation = "The patch format is wrong."
+                return self.observation, 0, False, self.info
             if "test_" in file or "_test.py" in file:
                 self.observation = "You cannot edit test file."
                 return self.observation, 0, False, self.info
