@@ -4,9 +4,7 @@ import tarfile
 
 from docker.models.containers import Container
 
-from intercode.envs import (
-  BashEnv, IntercodeEnv, AGENT_OBS, REWARD, ACTION_EXEC
-)
+from intercode.envs import BashEnv, IntercodeEnv, AGENT_OBS, REWARD, ACTION_EXEC
 from intercode.envs.swe import install
 from intercode.envs.swe import util
 
@@ -17,6 +15,7 @@ SPECIAL_COMMANDS = ("COMMAND", "SUBMIT", "SKIP", "PATCH")
 
 class SWEEnv(BashEnv):
     """Gym environmnet for SWE-bench"""
+
     name = "ic_swe"
 
     def __init__(self, image_name: str, **kwargs):
@@ -24,14 +23,16 @@ class SWEEnv(BashEnv):
         self.token = os.environ.get("GITHUB_TOKENS")
         self.installer = install.Installer(self.logger, self.container)
         if self.token is None:
-            raise ValueError("'GITHUB_TOKENS' is not specified as environment variable.")
+            raise ValueError(
+                "'GITHUB_TOKENS' is not specified as environment variable."
+            )
 
     def reset_container(self) -> None:
         self.workdir = "/"
-        folders = self.container.exec_run(self.clean_cmd('ls')).output.decode("utf-8")        
+        folders = self.container.exec_run(self.clean_cmd("ls")).output.decode("utf-8")
 
         # Clone repository if not already cloned
-        repo_name = self.record['repo'].replace("/", "__")
+        repo_name = self.record["repo"].replace("/", "__")
         if repo_name not in folders:
             self.logger.info(f"{repo_name} not found in container, cloning...")
             if "ZiyueWang25" in repo_name:
@@ -44,26 +45,31 @@ class SWEEnv(BashEnv):
                 raise ValueError(f"failed to clone repo: {output.decode()}")
 
         self.installer.install_pkg(self.record)
-        
+
         # Clean repository of any modifications + Checkout base commit
         self.workdir = f"/{repo_name}/"
         self.container.exec_run(self.clean_cmd("git status"), workdir=self.workdir)
         self.container.exec_run(self.clean_cmd("git restore ."), workdir=self.workdir)
-        self.container.exec_run(self.clean_cmd("git reset HEAD ."), workdir=self.workdir)
+        self.container.exec_run(
+            self.clean_cmd("git reset HEAD ."), workdir=self.workdir
+        )
         self.container.exec_run(self.clean_cmd("git clean -fdx"), workdir=self.workdir)
         self.container.exec_run(
-            self.clean_cmd(f"git -c advice.detachedHead=false checkout {self.record['base_commit']}"),
-            workdir=self.workdir)
+            self.clean_cmd(
+                f"git -c advice.detachedHead=false checkout {self.record['base_commit']}"
+            ),
+            workdir=self.workdir,
+        )
 
-        self.apply_patch(self.record['tests']['patch'], rm=False)
+        self.apply_patch(self.record["tests"]["patch"], rm=False)
 
     def step(self, action: str) -> Tuple[str, int, bool, Dict]:
         """
         Runs given action in environment and returns corresponding output
-        
+
         Args:
             action (`str`) - command to run in bash shell
-        
+
         Returns:
             observation (`str`) - standard output
             reward (`float`) - value between 0 and 1 quantifying correctness of output + environment state
@@ -108,7 +114,7 @@ class SWEEnv(BashEnv):
 
         if "SKIP" in action:
             return super().step("skip")
-        
+
         return self.observation, 0, False, self.info
 
     def apply_patch(self, patch: str, rm=True):
@@ -123,8 +129,7 @@ class SWEEnv(BashEnv):
         if rm:
             os.remove(patch_path)
             self.container.exec_run(
-                self.clean_cmd(f"rm {orig_patch_path}"),
-                workdir=self.workdir
+                self.clean_cmd(f"rm {orig_patch_path}"), workdir=self.workdir
             )
 
     def extract_command(self, action):
@@ -141,7 +146,7 @@ class SWEEnv(BashEnv):
 
     def get_reward(self) -> Tuple[float, Dict]:
         return int("failed" not in self.observation)
-    
+
     def close(self):
         self.logger.info("Beginning environment shutdown...")
         self.container.stop()

@@ -4,9 +4,10 @@ import pandas as pd
 
 from typing import Dict
 
-class IntercodeDataLoader():
+
+class IntercodeDataLoader:
     def __init__(self, data_path: str, parse_func: callable = None):
-        self._validate_file_path(data_path)    
+        self._validate_file_path(data_path)
         self.data_path = data_path
         # Add logic to apply parsing function to data (transform it into a row with query + gold)
         self.data = self._load_data()
@@ -17,7 +18,8 @@ class IntercodeDataLoader():
             index = np.random.randint(0, len(self.data))
         record = self.data.iloc[index].to_dict()
         record = {
-            key: value for key, value in record.items()
+            key: value
+            for key, value in record.items()
             if not (isinstance(value, float) and math.isnan(value))
         }
         return record
@@ -31,7 +33,7 @@ class IntercodeDataLoader():
             data = pd.read_csv(self.data_path, sep="\t")
         elif file_ext == "json":
             # keep trailing 0.
-            data = pd.read_json(self.data_path, dtype={'version': str})
+            data = pd.read_json(self.data_path, dtype={"version": str})
         elif file_ext == "pickle" or file_ext == "pkl":
             data = pd.read_pickle(self.data_path)
         else:
@@ -40,7 +42,7 @@ class IntercodeDataLoader():
         if "query" not in data.columns:
             raise ValueError("Data must have 'query' column/field")
         return data
-    
+
     def _validate_file_path(self, file_path: str):
         """Check if the file extension is one of tsv, csv, json, or pickle"""
         if not os.path.exists(file_path):

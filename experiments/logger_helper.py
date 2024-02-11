@@ -5,22 +5,25 @@ import logging
 import sys
 from typing import Dict
 
+
 def add_time_suffix(path):
     suffix = datetime.datetime.now().strftime("%y%m%d-%H:%M:%S")
     return add_suffix(path, suffix)
+
 
 def add_suffix(path, suffix):
     if not path:
         return ""
     path_wo_ext, ext = os.path.splitext(path)
-    return path_wo_ext+"_"+suffix + ext
+    return path_wo_ext + "_" + suffix + ext
 
 
-def get_msg_logger(filename:str="", file_level=logging.INFO, stdout_level=logging.DEBUG):
+def get_msg_logger(
+    filename: str = "", file_level=logging.INFO, stdout_level=logging.DEBUG
+):
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
-
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
 
     stdout_handler = logging.StreamHandler(sys.stdout)
     stdout_handler.setLevel(stdout_level)
@@ -35,16 +38,23 @@ def get_msg_logger(filename:str="", file_level=logging.INFO, stdout_level=loggin
 
     return logger
 
+
 class TurnLogger:
     def __init__(self, filename: str):
         self.log_path = filename
         self.log_data = {}
-    
+
     def _init_turn_history(self):
         return {"action": [], "observation": [], "reward": [], "is_valid_action": []}
-        
-    
-    def log_turn_history(self, idx: int, observation: str="", action: str="", reward: float=0.0, is_valid_action: bool=False):
+
+    def log_turn_history(
+        self,
+        idx: int,
+        observation: str = "",
+        action: str = "",
+        reward: float = 0.0,
+        is_valid_action: bool = False,
+    ):
         if idx not in self.log_data:
             raise ValueError("turn history is not initialized")
         self.log_data[idx]["turn_history"]["observation"].append(observation)
@@ -59,26 +69,28 @@ class TurnLogger:
             "task_id": idx,
             "query": env.query,
             "turn_history": self._init_turn_history(),
-
         }
         if "hardness" in record:
             log_episode["hardness"] = record["hardness"]
         self.log_data[idx] = log_episode
-    
+
     def log_summary(self, idx: int):
         turn_history = self.log_data[idx]["turn_history"]
         reward = 0 if not turn_history["reward"] else turn_history["reward"][-1]
         self.log_data[idx]["summary"] = {
-                "final_reward": reward,
-                "turns_taken": len(turn_history) + 1,
-            }
+            "final_reward": reward,
+            "turns_taken": len(turn_history) + 1,
+        }
 
     def save_turn(self):
         with open(self.log_path, "w") as fp:
-            json.dump(self.log_data, fp, indent=2)        
+            json.dump(self.log_data, fp, indent=2)
+
 
 class Logger:
-    def __init__(self, filename: str="", file_level=logging.INFO, stdout_level=logging.DEBUG):
+    def __init__(
+        self, filename: str = "", file_level=logging.INFO, stdout_level=logging.DEBUG
+    ):
         filename = add_time_suffix(filename)
         msg_file = add_suffix(filename, "msg") + ".txt" if filename else ""
         self.msg_logger = get_msg_logger(msg_file, file_level, stdout_level)
@@ -86,25 +98,25 @@ class Logger:
         self.turn_logger = TurnLogger(turn_file)
         self.disabled = False
 
-    def info(self, msg:str):
+    def info(self, msg: str):
         self.msg_logger.disabled = self.disabled
         self.msg_logger.info(msg)
-    
-    def debug(self, msg:str):
+
+    def debug(self, msg: str):
         self.msg_logger.disabled = self.disabled
         self.msg_logger.debug(msg)
-    
-    def warning(self, msg:str):
+
+    def warning(self, msg: str):
         self.msg_logger.disabled = self.disabled
         self.msg_logger.warning(msg)
 
-    def error(self, msg:str):
+    def error(self, msg: str):
         self.msg_logger.disabled = self.disabled
         self.msg_logger.error(msg)
-    
+
     def msg_record(self, record: Dict):
         self.msg_logger.info("Record")
-        for key in ["repo", "version", "task_id"]:            
+        for key in ["repo", "version", "task_id"]:
             self.msg_logger.info(f"{key}: {record[key]}")
 
     def msg_turn(self, turn, observation, action, reward, done, info):
@@ -119,15 +131,21 @@ class Logger:
         self.info(f"-- DONE:\n{done}")
         self.info(f"-- INFO:\n{info}")
 
-    def log_turn_history(self, idx: int, obs: str="", act: str="", reward: float=0.0, is_valid_action: bool=False):
+    def log_turn_history(
+        self,
+        idx: int,
+        obs: str = "",
+        act: str = "",
+        reward: float = 0.0,
+        is_valid_action: bool = False,
+    ):
         self.turn_logger.log_turn_history(idx, obs, act, reward, is_valid_action)
-    
+
     def log_episode(self, env, record: Dict, idx: int):
         self.turn_logger.log_episode(env, record, idx)
 
     def log_summary(self, idx: int):
         self.turn_logger.log_summary(idx)
-    
+
     def save_turn(self):
         self.turn_logger.save_turn()
-

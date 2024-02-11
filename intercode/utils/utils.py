@@ -8,13 +8,13 @@ START_UP_DELAY = 3
 
 
 class timeout:
-    def __init__(self, seconds=TIMEOUT_DURATION, error_message='Timeout'):
+    def __init__(self, seconds=TIMEOUT_DURATION, error_message="Timeout"):
         self.seconds = seconds
         self.error_message = error_message
 
     def handle_timeout(self, signum, frame):
         raise TimeoutError(self.error_message)
-    
+
     def __enter__(self):
         signal.signal(signal.SIGALRM, self.handle_timeout)
         signal.alarm(self.seconds)
@@ -43,19 +43,18 @@ def get_container(ctr_name: str, image_name: str, **kwargs) -> Container:
         for key in kwargs.copy().keys():
             if key not in ["command", "environment", "ports", "volumes"]:
                 del kwargs[key]
-                
+
         # Create + return new container from custom image
         image = client.images.get(image_name)
         container = client.containers.run(
-            image=image,
-            name=ctr_name,
-            detach=True,
-            tty=True,
-            **kwargs)
+            image=image, name=ctr_name, detach=True, tty=True, **kwargs
+        )
     time.sleep(START_UP_DELAY)
-    
+
     # Check if container was created successfully
     if not container:
-        raise RuntimeError(f"Failed to create and start `{ctr_name}` container successfully")
-    
+        raise RuntimeError(
+            f"Failed to create and start `{ctr_name}` container successfully"
+        )
+
     return container

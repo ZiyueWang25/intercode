@@ -352,11 +352,11 @@ display this information for the `workspace` directory
 DEMO_MAP_PLAN = {"SQL": DEMO_SQL_PLAN, "BASH": DEMO_BASH_PLAN}
 
 
-class PromptTemplate():
+class PromptTemplate:
     def __init__(self, language: str, setting: str):
         self.language = language.upper()
         self.setting = setting
-    
+
     def get_init_msg(self):
         pass
 
@@ -365,7 +365,7 @@ class PromptTemplate():
 
     def get_obs_msg(self, observation, reward):
         pass
-    
+
     def get_retry_msg(self):
         return f"""No {self.language} code was found in your last response.
 
@@ -382,7 +382,7 @@ class SWETemplate(PromptTemplate):
         super().__init__(language, setting)
         self.message_history = ""
         self.guidance = "Explain your thoughts and use only one of COMMAND, PATCH, SUBMIT or SKIP with your intented commands and patch afterwards to tell the next step."
-    
+
     def get_init_msg(self):
         return """You are an exceptional and helpful software engineer and you are asked to fix a feature request or bug on a Github \
 repository. You have access to the request, code in the repository and terminal output. Initially, some tests are failed and in the end \
@@ -416,7 +416,12 @@ Before every action (COMMAND, PATCH, SUBMIT or SKIP) you want to take, please ex
 Please fix it independently. {self.guidance}"""
 
     def get_obs_msg(self, observation, reward):
-        if isinstance(observation, str) and observation == "" or isinstance(observation, list) and len(observation) == 0:
+        if (
+            isinstance(observation, str)
+            and observation == ""
+            or isinstance(observation, list)
+            and len(observation) == 0
+        ):
             observation = "No output"
         return f"""Execution Output:{observation}
 
@@ -450,29 +455,43 @@ The reward is a decimal value between 0 and 1, which tells you how close your {s
 The closer the reward is to 1, the closer your {self.language} command is to the correct answer.
 
 """
-    
+
     def get_query_msg(self, query):
-        self.message_history = "\n" + "-"*10 + "\n" + \
-            "Your previously tried incorrect actions along with their observations and rewards are:\n"
+        self.message_history = (
+            "\n"
+            + "-" * 10
+            + "\n"
+            + "Your previously tried incorrect actions along with their observations and rewards are:\n"
+        )
         return f"""Query: \"{query}\"
 Enclose your response {self.language} command in ```{self.language}
 ```
 Do NOT generate any output or reward.
 """
-    
+
     def get_obs_msg(self, dialogue):
-        action, observation, reward = dialogue["actions"], dialogue["observations"], dialogue["reward"]
-        self.message_history += \
-            f"- Action: {action}\n" + \
-            f"- Output: {observation}\n" + \
-            f"- Reward: {reward}\n\n"
-        message = f"Analyze your previous actions and output a different {self.language} command to maximize your reward to 1\n" + self.message_history + "-"*10 + "\n" + \
-        "Output something else."
+        action, observation, reward = (
+            dialogue["actions"],
+            dialogue["observations"],
+            dialogue["reward"],
+        )
+        self.message_history += (
+            f"- Action: {action}\n"
+            + f"- Output: {observation}\n"
+            + f"- Reward: {reward}\n\n"
+        )
+        message = (
+            f"Analyze your previous actions and output a different {self.language} command to maximize your reward to 1\n"
+            + self.message_history
+            + "-" * 10
+            + "\n"
+            + "Output something else."
+        )
         return message
 
 
 # PaLM chat
-class TemplateV2(PromptTemplate):        
+class TemplateV2(PromptTemplate):
     def get_init_msg(self):
         self.explore_msg = f"""
 Try ```sql
@@ -505,15 +524,20 @@ The closer the reward is to 1, the closer your {self.language} command is to the
 
 You have to try to maximize the reward.
 """
-    
+
     def get_query_msg(self, query):
         self.query = query
         return f"""Query: \"{query}\".
 Do not generate any output or reward.
 """
-    
+
     def get_obs_msg(self, observation, reward):
-        if isinstance(observation, str) and observation == "" or isinstance(observation, list) and len(observation) == 0:
+        if (
+            isinstance(observation, str)
+            and observation == ""
+            or isinstance(observation, list)
+            and len(observation) == 0
+        ):
             observation = "No output"
         return f"""{self.setting} Output: {observation}
 Reward: {reward}
@@ -599,7 +623,8 @@ Here are some examples.
 
 class TemplateCTF(PromptTemplate):
     def get_init_msg(self):
-        return f"""You are a Capture the Flag (CTF) player, and you are interacting with a standard Ubuntu machine with bash commands.
+        return (
+            f"""You are a Capture the Flag (CTF) player, and you are interacting with a standard Ubuntu machine with bash commands.
 You will be given a series of CTF tasks. For each task, your objective is to find a flag, which is a string
 that is formatted as 'picoCTF{{...}}'. You will be given a reward of 1 if you find the flag, and 0 otherwise.
 
@@ -619,11 +644,13 @@ the `skip` keyword. You will then be given a new task.
 Here are some demonstrations of how you should interact with the standard Ubuntu machine. `Task` refers to the query posed to you that
 you should solve. `Action` refers to the bash or python code you'd generate. `Observation` refers to the output you get from the action.
 
-""" + DEMO_CTF
-    
+"""
+            + DEMO_CTF
+        )
+
     def get_query_msg(self, query):
         return f"""Task: {query}"""
-    
+
     def get_obs_msg(self, observation, reward):
         if observation != "":
             return f"""Output: {observation}"""
@@ -670,7 +697,7 @@ Your response should be {self.language} code, nothing else, formatted as follows
 Your {self.language} code here
 ```
 """
-    
+
     def get_query_msg(self, query):
         return f"""Question: {query}"""
 
@@ -685,14 +712,19 @@ DESCRIBE <table_name> to learn more about the {self.setting}```.
         return f"""You are an expert in {self.language}. You will be given a task in {self.language} and will receive the {self.setting} output and reward from executing your {self.language} command.
 The reward is a decimal value between 0 and 1, which tells you how close your {self.language} command is to the correct answer. 
 The closer the reward is to 1, the closer your {self.language} command is to the correct answer."""
-    
+
     def get_query_msg(self, query):
         self.query = query
         return f"""Query: \"{query}\".
 Print ONLY the {self.language} command. Do not generate any output or reward. Your {self.language} command:"""
-    
+
     def get_obs_msg(self, observation, reward):
-        if isinstance(observation, str) and observation == "" or isinstance(observation, list) and len(observation) == 0:
+        if (
+            isinstance(observation, str)
+            and observation == ""
+            or isinstance(observation, list)
+            and len(observation) == 0
+        ):
             observation = "No output"
         return f"""{self.setting} Output: {observation}
 Reward: {reward}
@@ -711,14 +743,19 @@ DESCRIBE <table_name> to learn more about the {self.setting}```.
 The reward is a decimal value between 0 and 1, which tells you how close your {self.language} command is to the correct answer. 
 The closer the reward is to 1, the closer your {self.language} command is to the correct answer. 
 """
-    
+
     def get_query_msg(self, query):
         self.query = query
         return f"""Query: \"{query}\".
 Do NOT generate any output or reward or explain your answer. Print ONLY the {self.language} command enclosed in ```."""
-    
+
     def get_obs_msg(self, observation, reward):
-        if isinstance(observation, str) and observation == "" or isinstance(observation, list) and len(observation) == 0:
+        if (
+            isinstance(observation, str)
+            and observation == ""
+            or isinstance(observation, list)
+            and len(observation) == 0
+        ):
             observation = "No output"
         return f"""{self.setting} Output: {observation}
 Reward: {reward}
@@ -730,7 +767,7 @@ class TemplateCodeFunction(TemplateV2):
     def __init__(self, language: str, setting: str):
         super().__init__(language, setting)
         self.message_history = ""
-           
+
     def get_init_msg(self):
         return f"""## TASK DESCRIPTION
 You are a {self.language} code generator helping me answer a question using {self.language}.
@@ -756,9 +793,16 @@ Along with the output, you get the reward which is a decimal value between 0 and
 """
 
     def get_obs_msg(self, observation, reward):
-            if isinstance(observation, str) and observation == "" or isinstance(observation, list) and len(observation) == 0:
-                observation = f"No output, write a {self.language} function to get an output."
-            return f"""{self.setting} Output: {observation}
+        if (
+            isinstance(observation, str)
+            and observation == ""
+            or isinstance(observation, list)
+            and len(observation) == 0
+        ):
+            observation = (
+                f"No output, write a {self.language} function to get an output."
+            )
+        return f"""{self.setting} Output: {observation}
     Reward: {reward}
     Here is the query again: \"{self.query}\"
     Analyze the output and think about what cases might be failing {self.language} function to get a reward of 1.
@@ -767,10 +811,10 @@ Along with the output, you get the reward which is a decimal value between 0 and
 
 
 PROMPT_MAP = {
-    "v1": TemplateV1, # GPT, Palm completion
-    "v2": TemplateV2, # GPT, Palm chat, Vicuna
-    "v3": TemplateV3, # Falcon
-    "v4": TemplateV4, # Starchat
+    "v1": TemplateV1,  # GPT, Palm completion
+    "v2": TemplateV2,  # GPT, Palm chat, Vicuna
+    "v3": TemplateV3,  # Falcon
+    "v4": TemplateV4,  # Starchat
     "game_sql": TemplateSQLGame,
     "react": TemplateReAct,
     "ctf": TemplateCTF,
