@@ -84,4 +84,5 @@ python -m experiments.eval_n_turn \
     --policy_type chat \
     --template swe \
     --model claude \
+    --num_tasks 20 \
     --verbose

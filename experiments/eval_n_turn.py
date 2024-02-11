@@ -108,7 +108,8 @@ class ExperimentWrapper:
         self.logger.debug("Start experiments")
         try:
             for idx in tqdm(
-                range(0, len(self.env.data_loader)), disable=self.args.verbose
+                range(0, min(len(self.env.data_loader), args.num_tasks)),
+                disable=self.args.verbose,
             ):
                 # Reset variables per task
                 self.env.reset(idx)
