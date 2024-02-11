@@ -76,7 +76,7 @@ class CompletionGPTPolicy(BasePolicy):
 
 class ChatGPTPolicy(BasePolicy):
     def __init__(self, language: str, setting: str, template: str, dialogue_limit: int = None,
-                 model: str = "gpt-3.5-turbo", response_limit: int = 1000, verbose=False):
+                 model: str = "gpt-3.5-turbo", response_limit: int = 1000):
         super().__init__()
         self.language = language.upper()
         self.setting = setting
@@ -85,13 +85,9 @@ class ChatGPTPolicy(BasePolicy):
         self.action_parser = ACTION_PARSER_MAP[language]
         self.model = model
         self.response_limit = response_limit
-        self.verbose = verbose
     
     def reset(self):
         self.dialogue = [{"role": "system", "content": self.template.get_init_msg()}]
-        if self.verbose:
-            print(f"System Message:\n {self.dialogue[0]['content']}")
-
 
     def add_to_dialogue(self, handicap: str):
         self.dialogue.append({"role": "system", "content": handicap})
@@ -113,10 +109,6 @@ class ChatGPTPolicy(BasePolicy):
             if self.dialogue_limit and len(self.dialogue) - 2 > self.dialogue_limit:
                 self.dialogue = self.dialogue[:2] + self.dialogue[-self.dialogue_limit:]
 
-        # Retrieve Action from ChatGPT
-        if self.verbose:
-            print(f"len(self.dialogue): {len(self.dialogue)}")
-            print(f"self.dialogue[-1]: {self.dialogue[-1]}")
         actions = ChatGPT(self.dialogue, model=self.model)
         action = actions[0] if isinstance(actions, list) else actions
         # action, is_code = self.action_parser(action)
@@ -125,7 +117,7 @@ class ChatGPTPolicy(BasePolicy):
 
 class ChatAnthropicPolicy(BasePolicy):
     def __init__(self, language: str, setting: str, template: str, dialogue_limit: int = None,
-                 model: str = "", response_limit: int = 1000, max_tokens=512, temperature=0, top_p=1, verbose=False):
+                 model: str = "", response_limit: int = 1000, max_tokens=512, temperature=0, top_p=1):
         super().__init__()
         self.language = language.upper()
         self.dialogue_limit = dialogue_limit
@@ -136,12 +128,9 @@ class ChatAnthropicPolicy(BasePolicy):
         self.temperature = temperature
         self.top_p = top_p
         self.response_limit = response_limit
-        self.verbose = verbose
     
     def reset(self):
         self.dialogue = []
-        if self.verbose:
-            print(f"System Message:\n {self.template.get_init_msg()}")
 
     def forward(self, query, observation, reward) -> Tuple[str, bool]:
         # Append response to dialogue
@@ -160,10 +149,6 @@ class ChatAnthropicPolicy(BasePolicy):
             if self.dialogue_limit and len(self.dialogue) - 2 > self.dialogue_limit:
                 self.dialogue = self.dialogue[:1] + self.dialogue[-self.dialogue_limit:]
 
-        # Retrieve Action from ChatGPT
-        if self.verbose:
-            print(f"len(self.dialogue): {len(self.dialogue)}")
-            print(f"self.dialogue[-1]: {self.dialogue[-1]}")
         actions = ChatAnthropic(self.dialogue, max_tokens=self.max_tokens, temperature=self.temperature, top_p=self.top_p,
                                 system=self.template.get_init_msg())
         action = actions[0] if isinstance(actions, list) else actions

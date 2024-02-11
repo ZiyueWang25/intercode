@@ -107,6 +107,18 @@ class Logger:
         for key in ["repo", "version", "task_id"]:            
             self.msg_logger.info(f"{key}: {record[key]}")
 
+    def msg_turn(self, turn, observation, action, reward, done, info):
+        self.info("#" * 20 + f" Turn {turn} " + "#" * 20)
+        self.info(f"-- ACTION:\n{action}")
+        if len(observation) > 200:
+            self.info(f"-- OBSERVATION:\n{observation[:200]} ...")
+        else:
+            self.info(f"-- OBSERVATION:\n{observation}")
+
+        self.info(f"-- REWARD:\n{reward}")
+        self.info(f"-- DONE:\n{done}")
+        self.info(f"-- INFO:\n{info}")
+
     def log_turn_history(self, idx: int, obs: str="", act: str="", reward: float=0.0, is_valid_action: bool=False):
         self.turn_logger.log_turn_history(idx, obs, act, reward, is_valid_action)
     

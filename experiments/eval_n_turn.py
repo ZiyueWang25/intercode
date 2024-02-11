@@ -78,16 +78,8 @@ class ExperimentWrapper():
                         break
 
                     observation, reward, done, info = self.env.step(action)
-                    self.logger.info("#" * 20 + f" Turn {turn} " + "#" * 20)
-                    self.logger.info(f"-- ACTION:\n{action}")
-                    if len(observation) > 200:
-                        self.logger.info(f"-- OBSERVATION:\n{observation[:200]} ...")
-                    else:
-                        self.logger.info(f"-- OBSERVATION:\n{observation}")
-
-                    self.logger.info(f"-- REWARD:\n{reward}")
-                    self.logger.info(f"-- DONE:\n{done}")
-                    self.logger.info(f"-- INFO:\n{info}")
+                    
+                    self.logger.msg_turn(turn, observation, action, reward, done, info)
                     self.logger.log_turn_history(idx, str(observation), action, reward, info[ACTION_EXEC])
 
                     if done:
