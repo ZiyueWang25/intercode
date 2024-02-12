@@ -1,6 +1,7 @@
 FROM ubuntu:latest
 
 RUN apt-get update && \
+    apt-get install tree && \
     apt-get install -y bash git && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
