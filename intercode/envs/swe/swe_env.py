@@ -61,7 +61,7 @@ class SWEEnv(BashEnv):
             workdir=self.workdir,
         )
 
-        self.apply_patch(self.record["tests"]["patch"], rm=False)
+        self.apply_patch(self.record["tests"]["patch"], rm=True)
 
     def step(self, action: str) -> Tuple[str, int, bool, Dict]:
         """
@@ -149,7 +149,9 @@ class SWEEnv(BashEnv):
         return patch
 
     def get_reward(self) -> Tuple[float, Dict]:
-        return int("failed" not in self.observation)
+        if self.info[ACTION_EXEC]:
+            return int("failed" not in self.observation)
+        return 0
 
     def close(self):
         self.logger.info("Beginning environment shutdown...")
