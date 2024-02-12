@@ -136,6 +136,8 @@ class IntercodeEnv(ABC, gym.Env):
             self.record = self.data_loader.get(self.query_idx)
             self.query = self.record["query"]
             self.gold = self.record["gold"] if "gold" in self.record else "N/A"
+            if self.gold == "N/A" and "patch" in self.record:
+                self.gold = self.record["patch"]
             self.logger.info(f"Query: {self.query}")
             self.logger.info(f"Gold: {self.gold}")
             self.observation = self.query
