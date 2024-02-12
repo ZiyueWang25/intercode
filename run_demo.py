@@ -109,10 +109,8 @@ def main(args):
                 ai_policy.reset()
             observation, reward, done = None, None, False
             query = env.query if hasattr(env, "query") else None
-            logger.info(f"------\nQuery {idx}: {env.query}")
             turn = 0
             while not done:
-                logger.info(f"- Turn {turn}")
                 turn += 1
                 if args.mode == "human":
                     action = human_policy.forward(query, observation)

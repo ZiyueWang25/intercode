@@ -111,6 +111,7 @@ class ExperimentWrapper:
                 range(0, min(len(self.env.data_loader), args.num_tasks)),
                 disable=self.args.verbose,
             ):
+                self.logger.info("#" * 20 + f" Query {idx} " + "#" * 20)
                 # Reset variables per task
                 self.env.reset(idx)
                 self.policy.reset()
@@ -122,8 +123,6 @@ class ExperimentWrapper:
                 if self.handicap is not None:
                     self.policy.add_to_dialogue(self.handicap(record))
 
-                self.logger.info("#" * 20 + f" Query {idx} " + "#" * 20)
-                self.logger.info(f"{self.env.query}")
                 observation, reward = None, None
                 for turn in range(self.args.max_turns):
                     try:

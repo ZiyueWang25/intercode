@@ -138,8 +138,10 @@ class IntercodeEnv(ABC, gym.Env):
             self.gold = self.record["gold"] if "gold" in self.record else "N/A"
             if self.gold == "N/A" and "patch" in self.record:
                 self.gold = self.record["patch"]
-            self.logger.info(f"Query: {self.query}")
-            self.logger.info(f"Gold: {self.gold}")
+            self.logger.info("#" * 20 + f" Query " + "#" * 20)
+            self.logger.info(f"{self.query}")
+            self.logger.info("#" * 20 + f" Gold " + "#" * 20)
+            self.logger.info(f"{self.gold}")
             self.observation = self.query
             self.reward = None
         else:
