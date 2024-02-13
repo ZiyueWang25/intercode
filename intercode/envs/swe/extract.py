@@ -20,7 +20,7 @@ class Command:
 
 
 def _extract_shell_or_patch(content: str):
-    if "```" in content:
+    if "```" in content and content.count("```") == 2:
         # obvious code block -- extract it
         return content.split("```")[1]
     if "\n" in content and content[: content.index("\n")].count("`") == 2:
