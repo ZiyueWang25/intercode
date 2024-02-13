@@ -57,13 +57,13 @@ class BashEnv(IntercodeEnv):
                 exit_code, output = self.container.exec_run(
                     self.clean_cmd(action), workdir="/" if is_cd_flag else self.workdir
                 )
-                self.observation = output.decode("utf-8")
+                self.observation += output.decode("utf-8")
                 self.info[ACTION_EXEC] = exit_code == 0
         except TimeoutError:
-            self.observation = f"Command timed out"
+            self.observation += f"Command timed out"
             self.info[ACTION_EXEC] = False
         except:
-            self.observation = "Malformed command"
+            self.observation += "Malformed command"
             self.info[ACTION_EXEC] = False
 
         if is_cd_flag and self.info[ACTION_EXEC]:
