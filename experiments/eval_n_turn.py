@@ -143,7 +143,7 @@ class ExperimentWrapper:
 
                     if done:
                         break
-
+                self.logger.log_summary(idx)
                 self.logger.info(f"Query {idx} Finished")
         except KeyboardInterrupt:
             print("Keyboard interrupt detected")

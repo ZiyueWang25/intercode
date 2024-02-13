@@ -68,6 +68,7 @@ class TurnLogger:
             "dataset": env.data_path,
             "task_id": idx,
             "query": env.query,
+            "gold": env.gold,
             "turn_history": self._init_turn_history(),
         }
         if "hardness" in record:
@@ -75,6 +76,8 @@ class TurnLogger:
         self.log_data[idx] = log_episode
 
     def log_summary(self, idx: int):
+        if "summary" in self.log_data[idx]:
+            return
         turn_history = self.log_data[idx]["turn_history"]
         reward = 0 if not turn_history["reward"] else turn_history["reward"][-1]
         self.log_data[idx]["summary"] = {
