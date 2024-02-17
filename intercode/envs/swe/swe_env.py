@@ -4,10 +4,11 @@ import tarfile
 
 from docker.models.containers import Container
 
-from intercode.envs import BashEnv, IntercodeEnv, AGENT_OBS, REWARD, ACTION_EXEC
+from intercode.envs import BashEnv, IntercodeEnv, AGENT_OBS, REWARD, EXEC_RESULTS
 from intercode.envs.swe import install
 from intercode.envs.swe import util
 from intercode.envs.swe import extract
+from intercode.envs.exec_result import ExecResult, SkipResult
 
 from typing import Dict, Tuple
 
@@ -29,38 +30,41 @@ class SWEEnv(BashEnv):
     def reset_container(self) -> None:
         self.workdir = "/"
         folders = self.container.exec_run(self.clean_cmd("ls")).output.decode("utf-8")
-
         # Clone repository if not already cloned
         repo_name = self.record["repo"].replace("/", "__")
         if repo_name not in folders:
             self.logger.info(f"{repo_name} not found in container, cloning...")
-            if "ZiyueWang25" in repo_name:
-                clone_cmd = f"git clone https://github.com/ziyuewang25/{repo_name}.git"
-            else:
-                clone_cmd = f"git clone https://github.com/swe-bench/{repo_name}.git"
-
-            code, output = self.container.exec_run(self.clean_cmd(clone_cmd))
-            if code != 0:
-                raise ValueError(f"failed to clone repo: {output.decode()}")
+            user = "ziyuewang" if "ZiyueWang25" in repo_name else "swe-bench"
+            clone_cmd = f"git clone https://github.com/{user}/{repo_name}.git"
+            is_valid = self.exec_action(clone_cmd)
+            if not is_valid:
+                raise ValueError(
+                    f"failed to clone repo: {self.info[EXEC_RESULTS][-1].output}"
+                )
 
         self.installer.install_pkg(self.record)
 
         # Clean repository of any modifications + Checkout base commit
         self.workdir = f"/{repo_name}/"
-        self.container.exec_run(self.clean_cmd("git status"), workdir=self.workdir)
-        self.container.exec_run(self.clean_cmd("git restore ."), workdir=self.workdir)
-        self.container.exec_run(
-            self.clean_cmd("git reset HEAD ."), workdir=self.workdir
-        )
-        self.container.exec_run(self.clean_cmd("git clean -fdx"), workdir=self.workdir)
-        self.container.exec_run(
-            self.clean_cmd(
-                f"git -c advice.detachedHead=false checkout {self.record['base_commit']}"
-            ),
-            workdir=self.workdir,
-        )
+        reset_commands = [
+            "git status",
+            "git restore .",
+            "git reset HEAD .",
+            "git clean -fdx",
+            f"git -c advice.detachedHead=false checkout {self.record['base_commit']}",
+        ]
+        for c in reset_commands:
+            if not self.exec_action(c):
+                raise RuntimeError(
+                    f"failed to execute {c!r}: {self.info[EXEC_RESULTS][-1].output}"
+                )
 
-        self.apply_patch(self.record["tests"]["patch"], rm=True)
+        if not self.apply_patch(
+            self.record["tests"]["patch"], rm=True, allow_test_edit=True
+        ):
+            raise RuntimeError(
+                f"failed to apply gold test patch: {self.info[EXEC_RESULTS][-1].output}"
+            )
 
     def step(self, action: str) -> Tuple[str, int, bool, Dict]:
         """
@@ -77,57 +81,60 @@ class SWEEnv(BashEnv):
         """
         self.observation = ""
         reward = 0
-        self.info = {ACTION_EXEC: False}
+        self.info = {EXEC_RESULTS: []}
         done = False
         commands = extract.get_commands(action)
         if not commands:
-            self.observation += (
-                f"Your action doesn't contain {(v for v in extract.SpecialCommandType)}"
-            )
-        for cnt, command in enumerate(commands):
-            self.observation += f"\nCommand {cnt} result:\n"
+            warn = f"Your action doesn't contain {tuple(v.value for v in extract.SpecialCommandType)}"
+            self.info[EXEC_RESULTS].append(ExecResult(action, 1, warn))
+        for command in commands:
             if command.type == extract.SpecialCommandType.SUBMIT:
-                self.observation += "Submit\n"
-                self.exec_action("pytest")
-                if self.info[ACTION_EXEC]:
-                    reward = int("failed" not in self.observation)
+                self.exec_action("echo 'Submit' && pytest")
+                if self.info[EXEC_RESULTS][-1].is_valid:
+                    reward = int("failed" not in self.info[EXEC_RESULTS][-1].output)
                 done = True
             if command.type == extract.SpecialCommandType.SKIP:
-                self.observation += "Skip"
-                self.info[ACTION_EXEC] = True
+                self.info[EXEC_RESULTS].append(SkipResult(action))
                 done = True
             if command.type == extract.SpecialCommandType.PATCH:
                 self.apply_patch(command.content)
             if command.type == extract.SpecialCommandType.SHELL:
                 self.exec_shell(command.content)
 
-            if done:
+            if done or not self.info[EXEC_RESULTS][-1].is_valid:
                 break
-
+        if len(self.info[EXEC_RESULTS]) > 1:
+            self.observation = "\n".join(
+                [
+                    f"Command {i} result: {exec_result.output}"
+                    for i, exec_result in enumerate(self.info[EXEC_RESULTS])
+                ]
+            )
+        elif len(self.info[EXEC_RESULTS]) == 1:
+            self.observation = self.info[EXEC_RESULTS][0].output
         return self.observation, reward, done, self.info
 
     def exec_shell(self, shell_content: str):
         if "nano " in shell_content:
-            self.observation += "You cannot manually edit the file. You are only allowed to use PATCH with the desired diff."
-            self.info[ACTION_EXEC] = False
+            warn = "You cannot manually edit the file. You are only allowed to use PATCH with the desired diff."
+            self.info[EXEC_RESULTS].append(ExecResult(shell_content, 1, warn))
             return
         if "rm " in shell_content:
-            self.observation += "You cannot remove any file. You are only allowed to use PATCH with the desired diff."
-            self.info[ACTION_EXEC] = False
+            warn = "You cannot remove any file. You are only allowed to use PATCH with the desired diff."
+            self.info[EXEC_RESULTS].append(ExecResult(shell_content, 1, warn))
             return
         self.exec_action(shell_content)
 
-    def apply_patch(self, patch: str, rm=True):
-        self.info["patch"] = patch
+    def apply_patch(self, patch: str, rm=True, allow_test_edit=False) -> bool:
         try:
             file = patch.split("---")[1].split("+++")[0].split("/")[-1].strip()
         except IndexError:
-            self.observation += "The patch format is wrong."
-            self.info[ACTION_EXEC] = False
+            warn = "The patch format is wrong."
+            self.info[EXEC_RESULTS].append(ExecResult(patch, 1, warn))
             return
-        if "test_" in file or "_test.py" in file:
-            self.observation += "You cannot edit test file."
-            self.info[ACTION_EXEC] = False
+        if not allow_test_edit and ("test_" in file or "_test.py" in file):
+            warn = "You cannot edit test file."
+            self.info[EXEC_RESULTS].append(ExecResult(patch, 1, warn))
             return
 
         orig_patch_path = "./patch.diff"
@@ -137,12 +144,11 @@ class SWEEnv(BashEnv):
         util.copy_to_container(self.container, patch_path, self.workdir)
 
         # Apply patch to testbed directory
-        self.exec_action(f"git apply -v {orig_patch_path}")
+        is_valid = self.exec_action(f"git apply -v {orig_patch_path}")
         if rm:
             os.remove(patch_path)
-            self.container.exec_run(
-                self.clean_cmd(f"rm {orig_patch_path}"), workdir=self.workdir
-            )
+            self.container.exec_run(f"rm {orig_patch_path}", workdir=self.workdir)
+        return is_valid
 
     def close(self):
         self.logger.info("Beginning environment shutdown...")

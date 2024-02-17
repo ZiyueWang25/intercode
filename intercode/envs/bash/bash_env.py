@@ -3,12 +3,13 @@ import math
 from sklearn.feature_extraction.text import TfidfVectorizer
 from typing import Dict, List, Tuple
 
+from intercode.envs.exec_result import ExecResult
 from intercode.envs.ic_env import (
     IntercodeEnv,
     AGENT_OBS,
     EVAL_OBS,
     CORRUPT_GOLD,
-    ACTION_EXEC,
+    EXEC_RESULTS,
     REWARD,
 )
 from intercode.utils import get_container, timeout
@@ -44,7 +45,7 @@ class BashEnv(IntercodeEnv):
                 f"Failed to reset `{self.container_name}` container successfully: {output}"
             )
 
-    def exec_action(self, action: str) -> None:
+    def exec_action(self, action: str) -> bool:
         """Executes action in bash shell"""
         is_cd_flag = action.startswith("cd")
         if is_cd_flag:
@@ -57,17 +58,13 @@ class BashEnv(IntercodeEnv):
                 exit_code, output = self.container.exec_run(
                     self.clean_cmd(action), workdir="/" if is_cd_flag else self.workdir
                 )
-                self.observation += output.decode("utf-8")
-                self.info[ACTION_EXEC] = exit_code == 0
+                self.info[EXEC_RESULTS].append(ExecResult(action, exit_code, output))
+            self.workdir = new_path if is_cd_flag else self.workdir
         except TimeoutError:
-            self.observation += f"Command timed out"
-            self.info[ACTION_EXEC] = False
+            self.info[EXEC_RESULTS].append(ExecResult(action, 1, "Command timed out"))
         except:
-            self.observation += "Malformed command"
-            self.info[ACTION_EXEC] = False
-
-        if is_cd_flag and self.info[ACTION_EXEC]:
-            self.workdir = new_path
+            self.info[EXEC_RESULTS].append(ExecResult(action, exit_code, output))
+        return self.info[EXEC_RESULTS][-1].is_valid
 
     def get_reward(self) -> Tuple[float, Dict]:
         """
