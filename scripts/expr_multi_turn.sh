@@ -75,7 +75,7 @@ set -e
 
 # SWE Call
 python -m experiments.eval_n_turn \
-    --data_path ./data/swe-bench/ic_swe_bench_dev.json \
+    --data_path ./data/swe-bench/ic_swe_bench_dev_sorted.json \
     --dialogue_limit 40 \
     --env swe \
     --image_name intercode-swe \
