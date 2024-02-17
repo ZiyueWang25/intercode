@@ -382,7 +382,7 @@ class SWETemplate(PromptTemplate):
         super().__init__(language, setting)
 
     def get_init_msg(self):
-        return """You are an exceptional and helpful software engineer and you are asked to fix a feature request or bug on a Github \
+        return """You are an exceptional and helpful software engineer. Please help me fix a feature request or bug on a Github \
 repository. You have access to the request, code in the repository and terminal output. Initially, some tests are failed and in the end \
 they should be successful after you fix the request. You can use shell commands `cat`, `ls`, `tree`, `pytest` and etc to view the code and check the test results. \
 You are not allowed to modify the tests and you must use the following special commands (SHELL, PATCH, SUBMIT, SKIP) to interact with the terminal.
@@ -410,10 +410,9 @@ Before every action (SHELL, PATCH, SUBMIT or SKIP) you want to take, please expl
 """
 
     def get_query_msg(self, query):
-        return f"""Here is the feature request scoped within <request> and </request>:
-<request>{query}</request>
+        return f"""Here is the feature request: {query}
 
-Please fix it independently. Explain your thoughts and use SHELL or PATCH with your intented commands and patch afterwards to tell the next step. You can also use SUBMIT or SKIP to finish this task."""
+Please fix it independently. Explain your thoughts before your action and use SHELL or PATCH with your intented commands and patch afterwards to tell the next step. You can also use SUBMIT or SKIP to finish this task."""
 
     def get_obs_msg(self, observation, reward):
         if (
@@ -808,7 +807,7 @@ Along with the output, you get the reward which is a decimal value between 0 and
 """
 
 
-PROMPT_MAP = {
+PROMPT_MAP: dict[str, PromptTemplate] = {
     "v1": TemplateV1,  # GPT, Palm completion
     "v2": TemplateV2,  # GPT, Palm chat, Vicuna
     "v3": TemplateV3,  # Falcon
