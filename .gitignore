@@ -141,3 +141,5 @@ data/swe-bench/swe-bench.json
 data/swe-bench/ToyExamples_dataset.json
 patch.diff
 testbed/
+notebooks/patch_test
+patch_test.diff
