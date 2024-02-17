@@ -54,7 +54,7 @@ ENV_MAP = {
     "swe": {
         "env": SWEEnv,
         "image_name": "intercode-swe",
-        "data_path": "./data/swe-bench/ic_swe_bench_dev.json",
+        "data_path": "./data/swe-bench/ic_swe_bench_dev_sorted.json",
     },
 }
 
