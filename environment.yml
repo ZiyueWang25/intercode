@@ -22,3 +22,4 @@ dependencies:
     - tenacity
     - sqlite3-to-mysql
     - google-generativeai
+    - matplotlib

@@ -380,13 +380,11 @@ Your {self.language} code here
 class SWETemplate(PromptTemplate):
     def __init__(self, language: str, setting: str):
         super().__init__(language, setting)
-        self.message_history = ""
-        self.guidance = "Explain your thoughts and use only one of SHELL, PATCH, SUBMIT or SKIP with your intented commands and patch afterwards to tell the next step."
 
     def get_init_msg(self):
-        return """You are an exceptional and helpful software engineer and you are asked to fix a feature request or bug on a Github \
+        return """You are an exceptional and helpful software engineer. Please help me fix a feature request or bug on a Github \
 repository. You have access to the request, code in the repository and terminal output. Initially, some tests are failed and in the end \
-they should be successful after you fix the request. You can use commands `cat`, `ls`, `pytest` and etc to view the code and check the test results. \
+they should be successful after you fix the request. You can use shell commands `cat`, `ls`, `tree`, `pytest` and etc to view the code and check the test results. \
 You are not allowed to modify the tests and you must use the following special commands (SHELL, PATCH, SUBMIT, SKIP) to interact with the terminal.
 
 - `SHELL: xxx”: Run shell command xxx. The command can be `cat`, `ls`, `pytest` and etc.
@@ -399,21 +397,22 @@ include proper line breaker ("\\n"), otherwise the diff cannot be applied succes
 You will be given the feature request in the beginning. Here is an example feature request and relevant interaction to fix it.
 - Terminal: “Here is the feature request or bug: “Adjust bar.py so that it can pass the test\n\n””
 - You: "First, I will check the existing files in the repository to see if there is a file named `bar.py`. SHELL: ls"
-- Terminal: "Execution Output:README\nfoo.py\ntest_foo.py"
+- Terminal: "Command output:README\nfoo.py\ntest_foo.py"
 - You: "We have a file named "bar.py" in the repository. Now, let's take a look at the content of "bar.py" to understand what needs to be adjusted. SHELL: cat bar.py"
 - ....
 - You: “Apply patch on bar.py to fix it. PATCH:```diff --git a/bar.py b/bar.py\n--- a/bar.py\n+++ b/bar.py\n@@ -1,4 +1,4 @@\n # example toy functions to test LLM agent fixing code ability\n \n def func(x):\n-  return x + 1\n+  return x + 2\n```”
-- Terminal: "Execution Output:Applied patch successfuly!"
+- Terminal: "Command output:Applied patch successfuly!"
 - You: "Let's verify if the test can pass now. SHELL: pytest"
-- Terminal: "Execution Output:....."
+- Terminal: "Command output:....."
 - You: "It should be good now. SUBMIT."
 
 Before every action (SHELL, PATCH, SUBMIT or SKIP) you want to take, please explain your thoughts.
 """
 
     def get_query_msg(self, query):
-        return f"""Here is the feature request or bug: “{query}”
-Please fix it independently. {self.guidance}"""
+        return f"""Here is the feature request: {query}
+
+Please fix it independently. Explain your thoughts before your action and use SHELL or PATCH with your intented commands and patch afterwards to tell the next step. You can also use SUBMIT or SKIP to finish this task."""
 
     def get_obs_msg(self, observation, reward):
         if (
@@ -423,9 +422,7 @@ Please fix it independently. {self.guidance}"""
             and len(observation) == 0
         ):
             observation = "No output"
-        return f"""Execution Output:{observation}
-
-{self.guidance}"""
+        return f"""{observation}"""
 
 
 # completion
@@ -810,7 +807,7 @@ Along with the output, you get the reward which is a decimal value between 0 and
 """
 
 
-PROMPT_MAP = {
+PROMPT_MAP: dict[str, PromptTemplate] = {
     "v1": TemplateV1,  # GPT, Palm completion
     "v2": TemplateV2,  # GPT, Palm chat, Vicuna
     "v3": TemplateV3,  # Falcon

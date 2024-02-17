@@ -13,6 +13,8 @@ RUN apt-get update && \
     python3 ./get-pip.py && \
     pip install pytest
 
+ENV python='python3'
+
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O miniconda.sh
 RUN bash miniconda.sh -b -u -p ./miniconda3
 RUN rm miniconda.sh

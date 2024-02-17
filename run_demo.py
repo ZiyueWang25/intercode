@@ -109,6 +109,8 @@ def main(args):
                 ai_policy.reset()
             observation, reward, done = None, None, False
             query = env.query if hasattr(env, "query") else None
+            logger.info(f"System Message:\n {ai_policy.template.get_init_msg()}")
+            logger.info(f"Query Message:\n {ai_policy.template.get_query_msg(query)}")
             turn = 0
             while not done:
                 turn += 1

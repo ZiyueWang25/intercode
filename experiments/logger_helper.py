@@ -45,7 +45,7 @@ class TurnLogger:
         self.log_data = {}
 
     def _init_turn_history(self):
-        return {"action": [], "observation": [], "reward": [], "is_valid_action": []}
+        return {"action": [], "observation": [], "reward": [], "info": []}
 
     def log_turn_history(
         self,
@@ -53,14 +53,19 @@ class TurnLogger:
         observation: str = "",
         action: str = "",
         reward: float = 0.0,
-        is_valid_action: bool = False,
+        info: bool = False,
     ):
         if idx not in self.log_data:
             raise ValueError("turn history is not initialized")
         self.log_data[idx]["turn_history"]["observation"].append(observation)
         self.log_data[idx]["turn_history"]["action"].append(action)
         self.log_data[idx]["turn_history"]["reward"].append(reward)
-        self.log_data[idx]["turn_history"]["is_valid_action"].append(is_valid_action)
+        self.log_data[idx]["turn_history"]["info"].append(
+            {
+                str(k): [str(x) for x in v] if isinstance(v, list) else str(v)
+                for k, v in info
+            }
+        )
 
     def log_episode(self, env, record: Dict, idx: int):
         log_episode = {
@@ -68,6 +73,7 @@ class TurnLogger:
             "dataset": env.data_path,
             "task_id": idx,
             "query": env.query,
+            "gold": env.gold,
             "turn_history": self._init_turn_history(),
         }
         if "hardness" in record:
@@ -75,6 +81,8 @@ class TurnLogger:
         self.log_data[idx] = log_episode
 
     def log_summary(self, idx: int):
+        if "summary" in self.log_data[idx]:
+            return
         turn_history = self.log_data[idx]["turn_history"]
         reward = 0 if not turn_history["reward"] else turn_history["reward"][-1]
         self.log_data[idx]["summary"] = {
@@ -137,9 +145,9 @@ class Logger:
         obs: str = "",
         act: str = "",
         reward: float = 0.0,
-        is_valid_action: bool = False,
+        info: dict = {},
     ):
-        self.turn_logger.log_turn_history(idx, obs, act, reward, is_valid_action)
+        self.turn_logger.log_turn_history(idx, obs, act, reward, info)
 
     def log_episode(self, env, record: Dict, idx: int):
         self.turn_logger.log_episode(env, record, idx)

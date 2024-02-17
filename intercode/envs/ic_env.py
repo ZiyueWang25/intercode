@@ -7,6 +7,7 @@ from typing import Dict, List, Tuple
 
 from intercode.utils import IntercodeDataLoader, get_container
 from experiments.logger_helper import Logger
+from intercode.envs.exec_result import SkipResult
 
 
 # Constants
@@ -14,6 +15,7 @@ AGENT_OBS = "agent_obs"
 EVAL_OBS = "eval_obs"
 CORRUPT_GOLD = "corrupt_gold"
 ACTION_EXEC = "action_executed"
+EXEC_RESULTS = "execution_results"
 REWARD = "reward"
 
 # TODO: save logger results to a central place for future reference
@@ -123,7 +125,7 @@ class IntercodeEnv(ABC, gym.Env):
             index (`int`) - index of query, gold pair to use for new session. If None, random index is used.
         """
         # Reset instance variables
-        self.info = {}
+        self.info = {EXEC_RESULTS: []}
         self.trajectory = []
         self.observation = None
 
@@ -155,7 +157,7 @@ class IntercodeEnv(ABC, gym.Env):
             preprocess_cmds = self.preprocess(self.record)
             for cmd in preprocess_cmds:
                 self.exec_action(cmd)
-                if not self.info[ACTION_EXEC]:
+                if any(not e.is_valid for e in self.info[EXEC_RESULTS]):
                     raise RuntimeError(
                         f"Preprocess command failed to execute successfully: {self.preprocess(self.record)}"
                     )

@@ -2,7 +2,7 @@ import logging
 import argparse, os
 from tqdm import tqdm
 
-from intercode.envs import ACTION_EXEC, initialize_env
+from intercode.envs import EXEC_RESULTS, initialize_env
 from experiments.policies import initialize_policy
 from experiments.logger_helper import Logger
 from experiments.utils import HANDICAP_MAP, PROMPT_MAP, SETTING_MAP
@@ -138,12 +138,12 @@ class ExperimentWrapper:
 
                     self.logger.msg_turn(turn, observation, action, reward, done, info)
                     self.logger.log_turn_history(
-                        idx, str(observation), action, reward, info[ACTION_EXEC]
+                        idx, str(observation), action, reward, info
                     )
 
                     if done:
                         break
-
+                self.logger.log_summary(idx)
                 self.logger.info(f"Query {idx} Finished")
         except KeyboardInterrupt:
             print("Keyboard interrupt detected")
