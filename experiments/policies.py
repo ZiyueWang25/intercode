@@ -1,6 +1,5 @@
 import re
-
-from typing import Tuple
+from typing import Tuple, Union
 
 from .utils import (
     ACTION_PARSER_MAP,
@@ -170,7 +169,7 @@ class ChatAnthropicPolicy(BasePolicy):
         template: str,
         dialogue_limit: int = None,
         model: str = "",
-        response_limit: int = 1000,
+        response_limit: int = 1000,  # todo.
         max_tokens=512,
         temperature=0,
         top_p=1,
@@ -189,7 +188,9 @@ class ChatAnthropicPolicy(BasePolicy):
     def reset(self):
         self.dialogue = []
 
-    def forward(self, query, observation, reward) -> Tuple[str, bool]:
+    def forward(
+        self, query: str, observation: Union[str, None], reward: Union[float, None]
+    ) -> Tuple[str, bool]:
         # Append response to dialogue
         if not self.dialogue:
             # First Turn
@@ -198,10 +199,8 @@ class ChatAnthropicPolicy(BasePolicy):
             )
         else:
             # Limit observation size due to context window thresholds for API call
-            if isinstance(observation, str) and len(observation) > self.response_limit:
+            if observation and len(observation) > self.response_limit:
                 observation = observation[: self.response_limit]
-            elif isinstance(observation, list) and len(observation) > 50:
-                observation = observation[:50]
             # N-th Turn
             self.dialogue.append(
                 {

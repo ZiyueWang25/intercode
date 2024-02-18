@@ -71,7 +71,7 @@ class ExperimentWrapper:
         log_file_name = f"{args.env}_multiturn_{args.model}_{args.max_turns}_turns"
         log_path = os.path.join(args.log_dir, log_file_name)
         self.logger = Logger(
-            log_path, file_level=logging.INFO, stdout_level=logging.DEBUG
+            log_path, file_level=logging.DEBUG, stdout_level=logging.INFO
         )
         if not args.verbose:
             self.logger.disabled = True

@@ -22,7 +22,7 @@ def get_msg_logger(
     filename: str = "", file_level=logging.INFO, stdout_level=logging.DEBUG
 ):
     logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
 
     stdout_handler = logging.StreamHandler(sys.stdout)
@@ -97,7 +97,7 @@ class TurnLogger:
 
 class Logger:
     def __init__(
-        self, filename: str = "", file_level=logging.INFO, stdout_level=logging.DEBUG
+        self, filename: str = "", file_level=logging.DEBUG, stdout_level=logging.INFO
     ):
         filename = add_time_suffix(filename)
         msg_file = add_suffix(filename, "msg") + ".txt" if filename else ""
@@ -137,7 +137,7 @@ class Logger:
 
         self.info(f"-- REWARD:\n{reward}")
         self.info(f"-- DONE:\n{done}")
-        self.info(f"-- INFO:\n{info}")
+        self.debug(f"-- INFO:\n{info}")
 
     def log_turn_history(
         self,

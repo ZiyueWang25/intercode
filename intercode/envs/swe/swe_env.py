@@ -36,6 +36,7 @@ class SWEEnv(BashEnv):
             self.logger.info(f"{repo_name} not found in container, cloning...")
             user = "ziyuewang" if "ZiyueWang25" in repo_name else "swe-bench"
             clone_cmd = f"git clone https://github.com/{user}/{repo_name}.git"
+            self.logger.debug(f"Clone: {clone_cmd}")
             is_valid = self.exec_action(clone_cmd)
             if not is_valid:
                 raise ValueError(

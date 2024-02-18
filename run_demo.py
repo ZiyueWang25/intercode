@@ -101,7 +101,7 @@ def main(args):
             ai_policy = ChatGPTPolicy(**policy_args)
 
     try:
-        for idx in range(min(len(env.data_loader), 3)):
+        for idx in range(len(env.data_loader)):
             env.reset(idx)
             record = env.data_loader.get(idx)
             logger.msg_record(record)

@@ -28,6 +28,10 @@ RUN export GIT_TRACE_PACKET=1
 RUN export GIT_TRACE=1
 RUN export GIT_CURL_VERBOSE=1
 
+# required for psutil
+RUN apt-get update && \
+    apt-get --assume-yes install gcc python3-dev
+
 # RUN git clone https://github.com/swe-bench/pyvista__pyvista.git
 # RUN git clone https://github.com/swe-bench/humaneval.git
 # RUN git clone https://github.com/swe-bench/pydicom__pydicom.git
