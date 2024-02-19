@@ -5,6 +5,7 @@ from intercode.envs.ic_env import (
     CORRUPT_GOLD,
     ACTION_EXEC,
     EXEC_RESULTS,
+    AGENT_OBSERVATION,
     REWARD,
 )
 from intercode.envs.bash.bash_env import BashEnv

@@ -3,7 +3,7 @@ import datetime
 import json
 import logging
 import sys
-from typing import Dict
+from typing import Any
 
 
 def add_time_suffix(path):
@@ -53,7 +53,7 @@ class TurnLogger:
         observation: str = "",
         action: str = "",
         reward: float = 0.0,
-        info: bool = False,
+        info: dict[str, Any] = {},
     ):
         if idx not in self.log_data:
             raise ValueError("turn history is not initialized")
@@ -63,11 +63,11 @@ class TurnLogger:
         self.log_data[idx]["turn_history"]["info"].append(
             {
                 str(k): [str(x) for x in v] if isinstance(v, list) else str(v)
-                for k, v in info
+                for k, v in info.items()
             }
         )
 
-    def log_episode(self, env, record: Dict, idx: int):
+    def log_episode(self, env, record: dict, idx: int):
         log_episode = {
             "environment": env.name,
             "dataset": env.data_path,
@@ -122,22 +122,22 @@ class Logger:
         self.msg_logger.disabled = self.disabled
         self.msg_logger.error(msg)
 
-    def msg_record(self, record: Dict):
+    def msg_record(self, record: dict):
         self.msg_logger.info("Record")
         for key in ["repo", "version", "task_id"]:
             self.msg_logger.info(f"{key}: {record[key]}")
 
     def msg_turn(self, turn, observation, action, reward, done, info):
         self.info("#" * 20 + f" Turn {turn} " + "#" * 20)
-        self.info(f"-- ACTION:\n{action}")
+        self.info("#" * 10 + f" ACTION:\n{action}")
         if len(observation) > 200:
-            self.info(f"-- OBSERVATION:\n{observation[:200]} ...")
+            self.info("#" * 10 + f" OBSERVATION:\n{observation[:200]} ...")
         else:
-            self.info(f"-- OBSERVATION:\n{observation}")
+            self.info("#" * 10 + f" OBSERVATION:\n{observation}")
 
-        self.info(f"-- REWARD:\n{reward}")
-        self.info(f"-- DONE:\n{done}")
-        self.debug(f"-- INFO:\n{info}")
+        self.info("#" * 10 + f" REWARD:\n{reward}")
+        self.info("#" * 10 + f" DONE:\n{done}")
+        self.debug("#" * 10 + f" INFO:\n{info}")
 
     def log_turn_history(
         self,
@@ -149,7 +149,7 @@ class Logger:
     ):
         self.turn_logger.log_turn_history(idx, obs, act, reward, info)
 
-    def log_episode(self, env, record: Dict, idx: int):
+    def log_episode(self, env, record: dict, idx: int):
         self.turn_logger.log_episode(env, record, idx)
 
     def log_summary(self, idx: int):

@@ -385,6 +385,7 @@ class SWETemplate(PromptTemplate):
         return """You are an exceptional and helpful software engineer. Please help me fix a feature request or bug on a Github \
 repository. You have access to the request, code in the repository and terminal output. Initially, some tests are failed and in the end \
 they should be successful after you fix the request. You can use shell commands `cat`, `ls`, `tree`, `pytest` and etc to view the code and check the test results. \
+Since you need to generate patch, you can use `-c` to view the line number, for example, `cat -n xxxx` and `grep -n xxx`. \
 You are not allowed to modify the tests and you must use the following special commands (SHELL, PATCH, SUBMIT, SKIP) to interact with the terminal.
 
 - `SHELL: xxx”: Run shell command xxx. The command can be `cat`, `ls`, `pytest` and etc.

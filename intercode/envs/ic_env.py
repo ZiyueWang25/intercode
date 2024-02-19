@@ -16,6 +16,7 @@ EVAL_OBS = "eval_obs"
 CORRUPT_GOLD = "corrupt_gold"
 ACTION_EXEC = "action_executed"
 EXEC_RESULTS = "execution_results"
+AGENT_OBSERVATION = "agent_observation"
 REWARD = "reward"
 
 # TODO: save logger results to a central place for future reference

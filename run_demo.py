@@ -8,7 +8,7 @@ import argparse
 import readline
 import os
 
-from intercode.envs import BashEnv, PythonEnv, SqlEnv, CTFEnv, SWEEnv
+from intercode.envs import BashEnv, PythonEnv, SqlEnv, CTFEnv, SWEEnv, AGENT_OBSERVATION
 from experiments.policies import HumanPolicy, ChatGPTPolicy, ChatAnthropicPolicy
 from experiments.logger_helper import Logger
 from experiments.utils import HANDICAP_MAP, PROMPT_MAP, SETTING_MAP, LANG_BY_ENV
@@ -106,6 +106,7 @@ def main(args):
             env.reset(idx)
             record = env.data_loader.get(idx)
             logger.msg_record(record)
+            logger.log_episode(env, record, idx)
             if ai_policy is not None:
                 ai_policy.reset()
             observation, reward, done = None, None, False
@@ -128,6 +129,7 @@ def main(args):
                 else:
                     raise ValueError(f"mode {args.mode!r} is not supported")
                 observation, reward, done, info = env.step(action)
+                info[AGENT_OBSERVATION] = ai_policy.dialogue_controller[-2]["content"]
                 logger.msg_turn(turn, observation, action, reward, done, info)
                 logger.log_turn_history(idx, str(observation), action, reward, info)
                 if reward == 1:
@@ -142,7 +144,6 @@ def main(args):
     except KeyboardInterrupt:
         logger.info("Exiting InterCode environment...")
     finally:
-        logger.log_summary(idx)
         logger.save_turn()
         env.close()
 
