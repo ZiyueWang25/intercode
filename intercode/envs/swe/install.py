@@ -56,16 +56,10 @@ class Installer:
 
     def activate_conda(self, env_name):
         code, output = self.container.exec_run(
-            self.clean_cmd(f". {self.path_activate} {env_name}")
+            self.clean_cmd(f". {self.path_activate} && conda activate {env_name}")
         )
         if code != 0:
             raise ValueError(f"failed to activate: {output.decode()}")
-        self.container.exec_run(self.clean_cmd(f"conda deactivate"))
-        if code != 0:
-            raise ValueError(f"failed to deactivate base: {output.decode()}")
-        self.container.exec_run(self.clean_cmd(f"conda activate {env_name}"))
-        if code != 0:
-            raise ValueError(f"failed to activate env: {output.decode()}")
 
     def install_pkg(self, instance):
         repo = instance["repo"]

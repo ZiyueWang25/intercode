@@ -98,6 +98,7 @@ class ExperimentWrapper:
             template=args.template,
             dialogue_limit=args.dialogue_limit,
         )
+        self.logger.debug(f"Dialogue Controller: {self.policy.dialogue_controller}")
 
         # Initialize handicap
         self.handicap = None

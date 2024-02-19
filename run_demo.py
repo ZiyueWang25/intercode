@@ -99,6 +99,7 @@ def main(args):
             ai_policy = ChatAnthropicPolicy(**policy_args)
         else:
             ai_policy = ChatGPTPolicy(**policy_args)
+        logger.debug(f"Dialogue Controller: {ai_policy.dialogue_controller}")
 
     try:
         for idx in range(len(env.data_loader)):
@@ -128,13 +129,21 @@ def main(args):
                     raise ValueError(f"mode {args.mode!r} is not supported")
                 observation, reward, done, info = env.step(action)
                 logger.msg_turn(turn, observation, action, reward, done, info)
+                logger.log_turn_history(idx, str(observation), action, reward, info)
                 if reward == 1:
                     logger.info("Solved!")
                     done = True
+                if turn > args.max_turns:
+                    logger.info("Exceed max turn, Skip")
+                    done = True
+            logger.log_summary(idx)
+            logger.info(f"Query {idx} Finished")
 
     except KeyboardInterrupt:
         logger.info("Exiting InterCode environment...")
     finally:
+        logger.log_summary(idx)
+        logger.save_turn()
         env.close()
 
 
@@ -170,13 +179,13 @@ if __name__ == "__main__":
         "--dialogue_limit",
         type=int,
         help='maximum number of turns in the policy\'s dialogue to keep, only used when the mode is "ai"',
-        default=999,
+        default=40,
     )
     parser.add_argument(
         "--max_turns",
         type=int,
         help='max number of interaction turns, only used when the mode is "ai"',
-        default=999,
+        default=20,
     )
     parser.add_argument(
         "--template",
