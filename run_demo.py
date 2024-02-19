@@ -172,9 +172,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--model",
         type=str,
-        choices=["claude", "gpt-4-1106-preview", "gpt-3.5-turbo"],
+        choices=["claude", "gpt-4-0125-preview", "gpt-3.5-turbo-0125"],
         help="model to use for AI policy",
-        default="gpt-4-1106-preview",
+        default="gpt-4-0125-preview",
     )
     parser.add_argument(
         "--dialogue_limit",
