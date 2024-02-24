@@ -1,16 +1,16 @@
-import io
 import os
-import tarfile
-
-from docker.models.containers import Container
-
-from intercode.envs import BashEnv, IntercodeEnv, AGENT_OBS, REWARD, EXEC_RESULTS
+from intercode.envs import BashEnv, IntercodeEnv, EXEC_RESULTS
 from intercode.envs.swe import install
 from intercode.envs.swe import util
 from intercode.envs.swe import extract
 from intercode.envs.exec_result import ExecResult, SkipResult
 
 from typing import Dict, Tuple
+
+# import io
+# import tarfile
+# from docker.models.containers import Container  # type: ignore
+# from intercode.envs import AGENT_OBS, REWARD
 
 
 class SWEEnv(BashEnv):
@@ -37,7 +37,9 @@ class SWEEnv(BashEnv):
             user = "ziyuewang" if "ZiyueWang25" in repo_name else "swe-bench"
             clone_cmd = f"git clone https://github.com/{user}/{repo_name}.git"
             self.logger.debug(f"Clone: {clone_cmd}")
-            is_valid = self.exec_action(clone_cmd)
+            is_valid = self.exec_action(
+                clone_cmd, timeout_duration=500
+            )  # Allow longer time for clone
             if not is_valid:
                 raise ValueError(
                     f"failed to clone repo: {self.info[EXEC_RESULTS][-1].output}"
@@ -48,14 +50,15 @@ class SWEEnv(BashEnv):
         # Clean repository of any modifications + Checkout base commit
         self.workdir = f"/{repo_name}/"
         reset_commands = [
-            "git status",
-            "git restore .",
-            "git reset HEAD .",
+            "git fetch",
+            f"git reset --hard {self.record['base_commit']}",
             "git clean -fdx",
             f"git -c advice.detachedHead=false checkout {self.record['base_commit']}",
         ]
         for c in reset_commands:
-            if not self.exec_action(c):
+            if not self.exec_action(
+                c, timeout_duration=60
+            ):  # Allow longer time for reset
                 raise RuntimeError(
                     f"failed to execute {c!r}: {self.info[EXEC_RESULTS][-1].output}"
                 )

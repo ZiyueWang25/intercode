@@ -1,9 +1,8 @@
-import requests, json
+import requests  # type: ignore
 import time
-from rich import print
 import re
 import os
-import config
+import config  # type: ignore
 
 # Set HuggingFace token from environment or config file
 access_token = os.environ.get("HF_TOKEN")
