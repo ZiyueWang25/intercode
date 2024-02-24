@@ -37,9 +37,7 @@ class SWEEnv(BashEnv):
             user = "ziyuewang" if "ZiyueWang25" in repo_name else "swe-bench"
             clone_cmd = f"git clone https://github.com/{user}/{repo_name}.git"
             self.logger.debug(f"Clone: {clone_cmd}")
-            is_valid = self.exec_action(
-                clone_cmd, timeout_duration=500
-            )  # Allow longer time for clone
+            is_valid = self.container.exec_run(clone_cmd)
             if not is_valid:
                 raise ValueError(
                     f"failed to clone repo: {self.info[EXEC_RESULTS][-1].output}"
@@ -56,9 +54,7 @@ class SWEEnv(BashEnv):
             f"git -c advice.detachedHead=false checkout {self.record['base_commit']}",
         ]
         for c in reset_commands:
-            if not self.exec_action(
-                c, timeout_duration=60
-            ):  # Allow longer time for reset
+            if not self.container.exec_run(c):
                 raise RuntimeError(
                     f"failed to execute {c!r}: {self.info[EXEC_RESULTS][-1].output}"
                 )
@@ -119,6 +115,12 @@ class SWEEnv(BashEnv):
         return self.observation, reward, done, self.info
 
     def exec_shell(self, shell_content: str):
+        path_conda = os.path.abspath("/miniconda3")
+        path_activate = os.path.join(path_conda, "bin", "activate")
+        repo = self.record["repo"]
+        version = self.record["version"]
+        repo_prefix = repo.replace("/", "__")
+        env_name = f"{repo_prefix}__{version}"
         if "nano " in shell_content:
             warn = "You cannot manually edit the file. You are only allowed to use PATCH with the desired diff."
             self.info[EXEC_RESULTS].append(ExecResult(shell_content, 1, warn))
@@ -127,7 +129,7 @@ class SWEEnv(BashEnv):
             warn = "You cannot remove any file. You are only allowed to use PATCH with the desired diff."
             self.info[EXEC_RESULTS].append(ExecResult(shell_content, 1, warn))
             return
-        self.exec_action(shell_content)
+        self.exec_action(f"source {path_activate} {env_name} && {shell_content}")
 
     def apply_patch(self, patch: str, rm=True, allow_test_edit=False) -> bool:
         try:
@@ -148,7 +150,7 @@ class SWEEnv(BashEnv):
         util.copy_to_container(self.container, patch_path, self.workdir)
 
         # Apply patch to testbed directory
-        is_valid = self.exec_action(f"git apply -v {orig_patch_path}")
+        is_valid = self.container.exec_run(f"git apply -v {orig_patch_path}")
         if rm:
             os.remove(patch_path)
             self.container.exec_run(f"rm {orig_patch_path}", workdir=self.workdir)
