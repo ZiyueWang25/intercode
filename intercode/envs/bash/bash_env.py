@@ -190,10 +190,8 @@ class BashEnv(IntercodeEnv):
     def clean_cmd(self, action: str) -> str:
         """Cleans action string"""
         entrypoint = IMAGE_TO_SETTINGS[self.image_name]
-        if '"' in action:
-            self.logger.warning(
-                f"\" in action: {action}. You should update it to use ' "
-            )
+        # Escape " from action
+        action = action.replace('"', '\\"')
         return f'{entrypoint} -c "{action.strip()}"'
 
     def parse_status(self, status: str) -> List:

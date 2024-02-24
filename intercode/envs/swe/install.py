@@ -48,10 +48,8 @@ class Installer:
     def clean_cmd(self, action: str) -> str:
         """Cleans action string"""
         entrypoint = "/bin/bash"
-        if '"' in action:
-            self.logger.warning(
-                f"\" in action: {action}. You should update it to use ' "
-            )
+        # Escape " from shell_content
+        action = action.replace('"', '\\"')
         return f'{entrypoint} -c "{action.strip()}"'
 
     def activate_conda(self, env_name):
