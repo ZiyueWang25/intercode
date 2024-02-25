@@ -2,7 +2,7 @@ import os
 import requests
 import re
 
-from docker.models.containers import Container
+from docker.models.containers import Container  # type: ignore
 
 from intercode.envs.swe import constants
 from intercode.envs.swe import util
@@ -48,10 +48,8 @@ class Installer:
     def clean_cmd(self, action: str) -> str:
         """Cleans action string"""
         entrypoint = "/bin/bash"
-        if '"' in action:
-            self.logger.warning(
-                f"\" in action: {action}. You should update it to use ' "
-            )
+        # Escape " from shell_content
+        action = action.replace('"', '\\"')
         return f'{entrypoint} -c "{action.strip()}"'
 
     def activate_conda(self, env_name):
@@ -151,6 +149,15 @@ class Installer:
             code, output = self.container.exec_run(self.clean_cmd(cmd))
             if code != 0:
                 raise ValueError(f"failed to install pip packages: {output.decode()}")
+
+        # Install the repo as an editable package
+        cmd = f"cd /{repo_prefix} && source {self.path_activate} {env_name} && {install['install']}"
+        self.logger.info(
+            f"[Testbed] Installing {repo} as an editable package for {env_name}; Command: {cmd}"
+        )
+        code, output = self.container.exec_run(self.clean_cmd(cmd))
+        if code != 0:
+            raise ValueError(f"failed to install repo: {output.decode()}")
 
 
 def get_requirements(instance: dict, save_path: str, container: Container):

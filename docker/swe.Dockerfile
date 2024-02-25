@@ -16,7 +16,8 @@ RUN apt-get update && \
 ENV python='python3'
 ENV conda='/miniconda3/bin/conda'
 
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O miniconda.sh
+RUN export unameArch="$(uname -m)"; \
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$unameArch.sh -O miniconda.sh
 RUN bash miniconda.sh -b -u -p ./miniconda3
 RUN rm miniconda.sh
 # support python=3.6 download

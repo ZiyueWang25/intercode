@@ -1,6 +1,6 @@
 import math
 
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore
 from typing import Dict, List, Tuple
 
 from intercode.envs.exec_result import ExecResult
@@ -13,6 +13,7 @@ from intercode.envs.ic_env import (
     REWARD,
 )
 from intercode.utils import get_container, timeout
+from intercode.utils.utils import TIMEOUT_DURATION
 
 GIT_RESET_SCRIPT = "git reset --hard; git clean -fd;"
 GIT_STATUS_SCRIPT = "git status --short;"
@@ -45,7 +46,7 @@ class BashEnv(IntercodeEnv):
                 f"Failed to reset `{self.container_name}` container successfully: {output}"
             )
 
-    def exec_action(self, action: str) -> bool:
+    def exec_action(self, action: str, timeout_duration=TIMEOUT_DURATION) -> bool:
         """Executes action in bash shell"""
         is_cd_flag = action.startswith("cd")
         if is_cd_flag:
@@ -54,7 +55,7 @@ class BashEnv(IntercodeEnv):
             action = f"cd {new_path}"
 
         try:
-            with timeout():
+            with timeout(seconds=timeout_duration):
                 exit_code, output = self.container.exec_run(
                     self.clean_cmd(action), workdir="/" if is_cd_flag else self.workdir
                 )
@@ -62,7 +63,7 @@ class BashEnv(IntercodeEnv):
             self.workdir = new_path if is_cd_flag else self.workdir
         except TimeoutError:
             self.info[EXEC_RESULTS].append(ExecResult(action, 1, "Command timed out"))
-        except:
+        except Exception as _:
             self.info[EXEC_RESULTS].append(ExecResult(action, exit_code, output))
         return self.info[EXEC_RESULTS][-1].is_valid
 
@@ -94,7 +95,7 @@ class BashEnv(IntercodeEnv):
                     self.clean_cmd(";".join(self.gold))
                 ).output.decode("utf-8")
             self.info[CORRUPT_GOLD] = False
-        except Exception as e:
+        except Exception as _:
             self.info[CORRUPT_GOLD] = True
 
         # Calculate Rewards
@@ -122,16 +123,21 @@ class BashEnv(IntercodeEnv):
 
         # PART 2: Check if files changed by both agent, gold commands were modified correctly
         p2_score = 0.33
+
         # Only check corrects of common changes that were added or modified
-        filter_changes = lambda x: (x[1] in ["A", "??", "C"])
+        def filter_changes(x):
+            return x[1] in ["A", "??", "C"]
+
         diff_same = [
             x for x in list(set(diff_agent) & set(diff_eval)) if filter_changes(x)
         ]
 
         if len(diff_same) > 0:
             same_changes = 0
+
             # Compute hashes for files and folders differently using md5 checksums
-            get_hash_cmd = lambda x: f"md5sum {x}" if "." in x else f"md5deep -r {x}"
+            def get_hash_cmd(x):
+                return f"md5sum {x}" if "." in x else f"md5deep -r {x}"
 
             for path in diff_same:
                 hash_cmd = get_hash_cmd(path[0])
@@ -158,7 +164,7 @@ class BashEnv(IntercodeEnv):
             tfidf = vect.fit_transform([info[AGENT_OBS], info[EVAL_OBS]])
             answer_similarity = tfidf * tfidf.T
             info["answer_similarity"] = answer_similarity.toarray()[0][1]
-        except:
+        except Exception as _:
             info["answer_similarity"] = 1 if info[AGENT_OBS] == info[EVAL_OBS] else 0
         p3_score = round(0.33 * info["answer_similarity"], 2)
         info[REWARD]["answer_similarity"] = p3_score
@@ -184,10 +190,8 @@ class BashEnv(IntercodeEnv):
     def clean_cmd(self, action: str) -> str:
         """Cleans action string"""
         entrypoint = IMAGE_TO_SETTINGS[self.image_name]
-        if '"' in action:
-            self.logger.warning(
-                f"\" in action: {action}. You should update it to use ' "
-            )
+        # Escape " from action
+        action = action.replace('"', '\\"')
         return f'{entrypoint} -c "{action.strip()}"'
 
     def parse_status(self, status: str) -> List:

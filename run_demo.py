@@ -111,8 +111,13 @@ def main(args):
                 ai_policy.reset()
             observation, reward, done = None, None, False
             query = env.query if hasattr(env, "query") else None
-            logger.info(f"System Message:\n {ai_policy.template.get_init_msg()}")
-            logger.info(f"Query Message:\n {ai_policy.template.get_query_msg(query)}")
+            try:
+                logger.info(f"System Message:\n {ai_policy.template.get_init_msg()}")
+                logger.info(
+                    f"Query Message:\n {ai_policy.template.get_query_msg(query)}"
+                )
+            except AttributeError as e:
+                logger.error(e)
             turn = 0
             while not done:
                 turn += 1
@@ -129,7 +134,12 @@ def main(args):
                 else:
                     raise ValueError(f"mode {args.mode!r} is not supported")
                 observation, reward, done, info = env.step(action)
-                info[AGENT_OBSERVATION] = ai_policy.dialogue_controller[-2]["content"]
+                try:
+                    info[AGENT_OBSERVATION] = ai_policy.dialogue_controller[-2][
+                        "content"
+                    ]
+                except AttributeError as e:
+                    logger.error(e)
                 logger.msg_turn(turn, observation, action, reward, done, info)
                 logger.log_turn_history(idx, str(observation), action, reward, info)
                 if reward == 1:

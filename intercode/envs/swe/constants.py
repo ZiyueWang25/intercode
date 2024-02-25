@@ -1,8 +1,5 @@
 MAP_VERSION_TO_INSTALL_TOY_EXAMPLES = {
-    k: {
-        "python": "3.6",
-    }
-    for k in ["0.01"]
+    k: {"python": "3.6", "install": "echo 'no install'"} for k in ["0.01"]
 }
 
 MAP_VERSION_TO_INSTALL_SKLEARN = {
