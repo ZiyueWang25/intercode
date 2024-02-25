@@ -34,10 +34,10 @@ class SWEEnv(BashEnv):
         repo_name = self.record["repo"].replace("/", "__")
         if repo_name not in folders:
             self.logger.info(f"{repo_name} not found in container, cloning...")
-            user = "ziyuewang" if "ZiyueWang25" in repo_name else "swe-bench"
+            user = "ziyuewang25" if "ZiyueWang25" in repo_name else "swe-bench"
             clone_cmd = f"git clone https://github.com/{user}/{repo_name}.git"
             self.logger.debug(f"Clone: {clone_cmd}")
-            is_valid = self.container.exec_run(clone_cmd)
+            is_valid = self.exec_action(clone_cmd, timeout_duration=180)
             if not is_valid:
                 raise ValueError(
                     f"failed to clone repo: {self.info[EXEC_RESULTS][-1].output}"
@@ -54,7 +54,7 @@ class SWEEnv(BashEnv):
             f"git -c advice.detachedHead=false checkout {self.record['base_commit']}",
         ]
         for c in reset_commands:
-            if not self.container.exec_run(c):
+            if not self.exec_action(c):
                 raise RuntimeError(
                     f"failed to execute {c!r}: {self.info[EXEC_RESULTS][-1].output}"
                 )
@@ -150,7 +150,7 @@ class SWEEnv(BashEnv):
         util.copy_to_container(self.container, patch_path, self.workdir)
 
         # Apply patch to testbed directory
-        is_valid = self.container.exec_run(f"git apply -v {orig_patch_path}")
+        is_valid = self.exec_action(f"git apply -v {orig_patch_path}")
         if rm:
             os.remove(patch_path)
             self.container.exec_run(f"rm {orig_patch_path}", workdir=self.workdir)
