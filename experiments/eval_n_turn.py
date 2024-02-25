@@ -114,10 +114,10 @@ class ExperimentWrapper:
             ):
                 self.logger.info("#" * 20 + f" Query {idx} " + "#" * 20)
                 # Reset variables per task
-                self.env.reset(idx)
-                self.policy.reset()
                 record = self.env.data_loader.get(idx)
                 self.logger.msg_record(record)
+                self.env.reset(idx)
+                self.policy.reset()
                 self.logger.log_episode(self.env, record, idx)
 
                 # Add Handicap
