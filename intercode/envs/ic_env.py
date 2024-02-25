@@ -132,7 +132,6 @@ class IntercodeEnv(ABC, gym.Env):
 
         # Set query, gold command
         if not self.tool_mode:
-            self.logger.info("-------------\nNew task episode initialized")
             self.query_idx = (
                 np.random.randint(0, len(self.data_loader)) if index is None else index
             )
@@ -141,10 +140,6 @@ class IntercodeEnv(ABC, gym.Env):
             self.gold = self.record["gold"] if "gold" in self.record else "N/A"
             if self.gold == "N/A" and "patch" in self.record:
                 self.gold = self.record["patch"]
-            self.logger.info("#" * 20 + f" Query " + "#" * 20)
-            self.logger.info(f"{self.query}")
-            self.logger.info("#" * 20 + f" Gold " + "#" * 20)
-            self.logger.info(f"{self.gold}")
             self.observation = self.query
             self.reward = None
         else:

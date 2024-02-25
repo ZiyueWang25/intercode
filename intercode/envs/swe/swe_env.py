@@ -44,6 +44,10 @@ class SWEEnv(BashEnv):
                 )
 
         self.installer.install_pkg(self.record)
+        conda_env_name = f"{repo_name}__{self.record['version']}"
+        self.activate_command = (
+            f"source {self.installer.path_activate} {conda_env_name}"
+        )
 
         # Clean repository of any modifications + Checkout base commit
         self.workdir = f"/{repo_name}/"
@@ -115,12 +119,6 @@ class SWEEnv(BashEnv):
         return self.observation, reward, done, self.info
 
     def exec_shell(self, shell_content: str):
-        path_conda = os.path.abspath("/miniconda3")
-        path_activate = os.path.join(path_conda, "bin", "activate")
-        repo = self.record["repo"]
-        version = self.record["version"]
-        repo_prefix = repo.replace("/", "__")
-        env_name = f"{repo_prefix}__{version}"
         if "nano " in shell_content:
             warn = "You cannot manually edit the file. You are only allowed to use PATCH with the desired diff."
             self.info[EXEC_RESULTS].append(ExecResult(shell_content, 1, warn))
@@ -129,7 +127,7 @@ class SWEEnv(BashEnv):
             warn = "You cannot remove any file. You are only allowed to use PATCH with the desired diff."
             self.info[EXEC_RESULTS].append(ExecResult(shell_content, 1, warn))
             return
-        self.exec_action(f"source {path_activate} {env_name} && {shell_content}")
+        self.exec_action(f"{self.activate_command} && {shell_content}")
 
     def apply_patch(self, patch: str, rm=True, allow_test_edit=False) -> bool:
         try:

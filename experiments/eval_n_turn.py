@@ -107,17 +107,18 @@ class ExperimentWrapper:
 
     def run_expr(self):
         self.logger.debug("Start experiments")
+        num_tasks = 999999 if args.num_tasks == -1 else args.num_tasks
         try:
             for idx in tqdm(
-                range(0, min(len(self.env.data_loader), args.num_tasks)),
+                range(0, min(len(self.env.data_loader), num_tasks)),
                 disable=self.args.verbose,
             ):
                 self.logger.info("#" * 20 + f" Query {idx} " + "#" * 20)
                 # Reset variables per task
-                self.env.reset(idx)
-                self.policy.reset()
                 record = self.env.data_loader.get(idx)
                 self.logger.msg_record(record)
+                self.env.reset(idx)
+                self.policy.reset()
                 self.logger.log_episode(self.env, record, idx)
 
                 # Add Handicap

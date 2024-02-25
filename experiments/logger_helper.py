@@ -99,6 +99,8 @@ class Logger:
     def __init__(
         self, filename: str = "", file_level=logging.DEBUG, stdout_level=logging.INFO
     ):
+        dir = os.path.dirname(filename)
+        os.makedirs(dir, exist_ok=True)
         filename = add_time_suffix(filename)
         msg_file = add_suffix(filename, "msg") + ".txt" if filename else ""
         self.msg_logger = get_msg_logger(msg_file, file_level, stdout_level)
