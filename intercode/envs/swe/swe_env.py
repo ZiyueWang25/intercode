@@ -93,7 +93,7 @@ class SWEEnv(BashEnv):
             self.info[EXEC_RESULTS].append(ExecResult(action, 1, warn))
         for command in commands:
             if command.type == extract.SpecialCommandType.SUBMIT:
-                self.exec_action("echo 'Submit' && {activate_command} && pytest")
+                self.exec_action("echo 'Submit' && pytest")
                 if self.info[EXEC_RESULTS][-1].is_valid:
                     reward = int("failed" not in self.info[EXEC_RESULTS][-1].output)
                 done = True
